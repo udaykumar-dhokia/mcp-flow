@@ -1,0 +1,182 @@
+'use client';
+
+import React from 'react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import {
+  Cancel01Icon,
+  CopyIcon,
+  CheckmarkCircle01Icon,
+  Download01Icon,
+} from '@hugeicons/core-free-icons';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
+interface CodeExportModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  code: string;
+}
+
+const PACKAGE_JSON = `{
+  "name": "mcp-flow-server",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "mcp-use dev",
+    "build": "mcp-use build",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "mcp-use": "latest",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}`;
+
+export default function CodeExportModal({ isOpen, onClose, code }: CodeExportModalProps) {
+  const [copied, setCopied] = React.useState(false);
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const downloadFile = (content: string, filename: string) => {
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+          />
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            className="relative w-full max-w-2xl overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950"
+          >
+            <div className="flex items-center justify-between border-b border-zinc-100 px-5 py-3 dark:border-zinc-800">
+              <h3 className="text-sm font-semibold">Generated MCP Server</h3>
+              <button
+                onClick={onClose}
+                className="rounded-full p-1 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-900"
+              >
+                <HugeiconsIcon icon={Cancel01Icon} size={16} />
+              </button>
+            </div>
+
+            <Tabs defaultValue="server" className="flex flex-col">
+              <TabsList className="mx-5 mt-3 grid w-auto grid-cols-2">
+                <TabsTrigger value="server" className="text-xs">
+                  index.ts
+                </TabsTrigger>
+                <TabsTrigger value="package" className="text-xs">
+                  package.json
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="server" className="px-5 pb-5">
+                <div className="mb-2 flex justify-end gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 gap-1 text-[10px]"
+                    onClick={() => copyToClipboard(code)}
+                  >
+                    {copied ? (
+                      <HugeiconsIcon
+                        icon={CheckmarkCircle01Icon}
+                        size={12}
+                        className="text-emerald-500"
+                      />
+                    ) : (
+                      <HugeiconsIcon icon={CopyIcon} size={12} />
+                    )}
+                    {copied ? 'Copied' : 'Copy'}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 gap-1 text-[10px]"
+                    onClick={() => downloadFile(code, 'index.ts')}
+                  >
+                    <HugeiconsIcon icon={Download01Icon} size={12} />
+                    Download
+                  </Button>
+                </div>
+                <div className="max-h-87.5 overflow-y-auto rounded-lg bg-zinc-50 p-4 dark:bg-zinc-900">
+                  <pre className="font-mono text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-400">
+                    {code}
+                  </pre>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="package" className="px-5 pb-5">
+                <div className="mb-2 flex justify-end gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 gap-1 text-[10px]"
+                    onClick={() => copyToClipboard(PACKAGE_JSON)}
+                  >
+                    <HugeiconsIcon icon={CopyIcon} size={12} />
+                    Copy
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 gap-1 text-[10px]"
+                    onClick={() => downloadFile(PACKAGE_JSON, 'package.json')}
+                  >
+                    <HugeiconsIcon icon={Download01Icon} size={12} />
+                    Download
+                  </Button>
+                </div>
+                <div className="max-h-87.5 overflow-y-auto rounded-lg bg-zinc-50 p-4 dark:bg-zinc-900">
+                  <pre className="font-mono text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-400">
+                    {PACKAGE_JSON}
+                  </pre>
+                </div>
+              </TabsContent>
+            </Tabs>
+
+            <div className="border-t border-zinc-100 px-5 py-4 dark:border-zinc-800">
+              <h4 className="mb-1.5 text-[10px] font-bold tracking-wider text-zinc-500 uppercase">
+                Quick Start
+              </h4>
+              <ol className="list-decimal space-y-1 pl-4 text-[11px] text-zinc-500">
+                <li>Download both files into a new directory</li>
+                <li>
+                  Run{' '}
+                  <code className="font-mono text-zinc-700 dark:text-zinc-300">npm install</code>
+                </li>
+                <li>
+                  Run{' '}
+                  <code className="font-mono text-zinc-700 dark:text-zinc-300">npm run dev</code>
+                </li>
+                <li>Add the server URL to Claude, Cursor, or ChatGPT</li>
+              </ol>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+}

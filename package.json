@@ -1,0 +1,25 @@
+{
+  "name": "mcp-flow",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Node-based no-code platform for creating and deploying MCP servers visually.",
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\"",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.6.1",
+    "@commitlint/config-conventional": "^19.6.0",
+    "@typescript-eslint/eslint-plugin": "^8.59.0",
+    "@typescript-eslint/parser": "^8.59.0",
+    "eslint": "^9.18.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.4.1",
+    "prettier": "^3.4.2",
+    "prettier-plugin-tailwindcss": "latest",
+    "typescript-eslint": "^8.20.0"
+  }
+}

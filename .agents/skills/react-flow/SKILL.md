@@ -66,6 +66,7 @@ export default Flow;
 ### Nodes
 
 Nodes are the building blocks of the graph. Each node has:
+
 - `id`: Unique identifier
 - `type`: Node type (built-in or custom)
 - `position`: { x, y } coordinates
@@ -85,6 +86,7 @@ const node: Node = {
 ```
 
 Built-in node types:
+
 - `default`: Standard node
 - `input`: No target handles
 - `output`: No source handles
@@ -93,6 +95,7 @@ Built-in node types:
 ### Edges
 
 Edges connect nodes. Each edge requires:
+
 - `id`: Unique identifier
 - `source`: Source node ID
 - `target`: Target node ID
@@ -112,6 +115,7 @@ const edge: Edge = {
 ```
 
 Built-in edge types:
+
 - `default`: Bezier curve
 - `straight`: Straight line
 - `step`: Orthogonal with sharp corners
@@ -398,7 +402,7 @@ const { screenToFlowPosition, setNodes } = useReactFlow();
 
 const onPaneClick = (event: React.MouseEvent) => {
   const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
-  setNodes(nodes => [...nodes, { id: `node-${Date.now()}`, position, data: { label: 'New' } }]);
+  setNodes((nodes) => [...nodes, { id: `node-${Date.now()}`, position, data: { label: 'New' } }]);
 };
 ```
 

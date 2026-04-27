@@ -72,7 +72,7 @@ export function Modal({ isOpen, onClose, children }: ModalProps) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/50 z-40"
+            className="fixed inset-0 z-40 bg-black/50"
           />
 
           {/* Modal */}
@@ -83,9 +83,7 @@ export function Modal({ isOpen, onClose, children }: ModalProps) {
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             className="fixed inset-0 z-50 flex items-center justify-center"
           >
-            <div className="bg-white rounded-xl p-6 max-w-md w-full">
-              {children}
-            </div>
+            <div className="w-full max-w-md rounded-xl bg-white p-6">{children}</div>
           </motion.div>
         </>
       )}
@@ -121,11 +119,7 @@ const itemVariants = {
 
 export function StaggeredList({ items }: { items: string[] }) {
   return (
-    <motion.ul
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-    >
+    <motion.ul variants={containerVariants} initial="hidden" animate="visible">
       {items.map((item, index) => (
         <motion.li key={index} variants={itemVariants}>
           {item}
@@ -146,11 +140,7 @@ const buttonVariants = {
   disabled: { opacity: 0.5, scale: 1 },
 };
 
-export function AnimatedButton({
-  children,
-  disabled,
-  onClick,
-}: ButtonProps) {
+export function AnimatedButton({ children, disabled, onClick }: ButtonProps) {
   return (
     <motion.button
       variants={buttonVariants}
@@ -160,7 +150,7 @@ export function AnimatedButton({
       animate={disabled ? 'disabled' : 'initial'}
       onClick={onClick}
       disabled={disabled}
-      className="px-4 py-2 bg-blue-500 text-white rounded-lg"
+      className="rounded-lg bg-blue-500 px-4 py-2 text-white"
     >
       {children}
     </motion.button>
@@ -202,15 +192,11 @@ export function Tabs({ tabs, activeTab, onTabChange }: TabsProps) {
     <LayoutGroup>
       <div className="flex gap-2">
         {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => onTabChange(tab.id)}
-            className="relative px-4 py-2"
-          >
+          <button key={tab.id} onClick={() => onTabChange(tab.id)} className="relative px-4 py-2">
             {activeTab === tab.id && (
               <motion.div
                 layoutId="activeTab"
-                className="absolute inset-0 bg-blue-500 rounded-lg"
+                className="absolute inset-0 rounded-lg bg-blue-500"
                 transition={{ type: 'spring', stiffness: 500, damping: 30 }}
               />
             )}
@@ -236,7 +222,7 @@ export function DraggableCard() {
       dragElastic={0.2}
       dragTransition={{ bounceStiffness: 600, bounceDamping: 20 }}
       whileDrag={{ scale: 1.1, cursor: 'grabbing' }}
-      className="w-32 h-32 bg-blue-500 rounded-lg cursor-grab"
+      className="h-32 w-32 cursor-grab rounded-lg bg-blue-500"
     />
   );
 }
@@ -259,7 +245,7 @@ export function SwipeToDelete({ onDelete, children }: SwipeProps) {
     >
       {children}
       <motion.div
-        className="absolute right-0 inset-y-0 bg-red-500 flex items-center px-4"
+        className="absolute inset-y-0 right-0 flex items-center bg-red-500 px-4"
         style={{ opacity: 0 }}
         animate={{ opacity: 1 }}
       >
@@ -306,10 +292,7 @@ export function ParallaxHero() {
   const opacity = useTransform(scrollY, [0, 300], [1, 0]);
 
   return (
-    <motion.div
-      style={{ y, opacity }}
-      className="h-screen flex items-center justify-center"
-    >
+    <motion.div style={{ y, opacity }} className="flex h-screen items-center justify-center">
       <h1 className="text-6xl font-bold">Parallax Hero</h1>
     </motion.div>
   );
@@ -321,7 +304,7 @@ export function ScrollProgress() {
   return (
     <motion.div
       style={{ scaleX: scrollYProgress }}
-      className="fixed top-0 left-0 right-0 h-1 bg-blue-500 origin-left z-50"
+      className="fixed top-0 right-0 left-0 z-50 h-1 origin-left bg-blue-500"
     />
   );
 }
@@ -343,11 +326,7 @@ export function SubmitButton() {
     await animate(scope.current, { scale: 1 }, { type: 'spring' });
 
     // Success animation
-    await animate(
-      scope.current,
-      { backgroundColor: '#22c55e' },
-      { duration: 0.2 }
-    );
+    await animate(scope.current, { backgroundColor: '#22c55e' }, { duration: 0.2 });
   };
 
   return (
@@ -373,7 +352,7 @@ export function RotatingCard() {
       drag="x"
       dragConstraints={{ left: -200, right: 200 }}
       style={{ x, rotateY, opacity }}
-      className="w-64 h-96 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl"
+      className="h-96 w-64 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500"
     />
   );
 }
@@ -527,7 +506,7 @@ export const transitions = {
 } as const;
 
 // Usage
-<motion.div transition={transitions.spring} />
+<motion.div transition={transitions.spring} />;
 ```
 
 ## Reduced Motion Support

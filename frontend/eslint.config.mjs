@@ -3,7 +3,14 @@ import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 
 const eslintConfig = defineConfig([
-  ...nextVitals,
+  ...nextVitals.map((config) => ({
+    ...config,
+    settings: {
+      next: {
+        rootDir: "frontend",
+      },
+    },
+  })),
   ...nextTs,
   // Override default ignores of eslint-config-next.
   globalIgnores([

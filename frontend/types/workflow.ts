@@ -65,3 +65,18 @@ export interface Graph {
   nodes: GraphNode[];
   edges: GraphEdge[];
 }
+
+export interface ExecutionNodeResult {
+  nodeId: string;
+  status: 'success' | 'error' | 'skipped' | 'idle';
+  duration?: number;
+  error?: string;
+}
+
+export interface WorkflowExecutionResponse {
+  data?: Record<string, unknown>;
+  error?: string;
+  _execution?: {
+    nodes: ExecutionNodeResult[];
+  };
+}

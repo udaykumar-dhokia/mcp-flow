@@ -5,21 +5,9 @@ import { Handle, Position, NodeProps } from '@xyflow/react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { GitBranchIcon } from '@hugeicons/core-free-icons';
 import { GraphNodeData } from '../../../types/workflow';
-import { useFlowStore } from '@/lib/useFlowStore';
+import { NodeWrapper } from './NodeWrapper';
 
 const ConditionNode = ({ data, id, selected }: NodeProps) => {
-  const executionNodeStatuses = useFlowStore((s) => s.executionNodeStatuses);
-  const nodeStatus = executionNodeStatuses.find((s) => s.nodeId === id);
-
-  const statusColor =
-    nodeStatus?.status === 'running'
-      ? 'border-blue-500'
-      : nodeStatus?.status === 'success'
-        ? 'border-emerald-500'
-        : nodeStatus?.status === 'error'
-          ? 'border-red-500'
-          : 'border-zinc-200 dark:border-zinc-800';
-
   const d = data as GraphNodeData;
   const field = d.field || '';
   const operator = d.operator || 'equals';
@@ -38,11 +26,9 @@ const ConditionNode = ({ data, id, selected }: NodeProps) => {
   };
 
   return (
-    <div
-      className={`min-w-[240px] overflow-hidden rounded-lg border bg-white dark:bg-zinc-950 ${statusColor} ${selected ? 'ring-2 ring-blue-500/40' : ''}`}
-    >
-      <div className="flex items-center gap-2 border-b border-zinc-100 bg-orange-50 px-3 py-2 dark:border-zinc-800 dark:bg-orange-950/30">
-        <div className="flex size-6 items-center justify-center rounded bg-orange-500 text-white">
+    <NodeWrapper id={id} selected={selected}>
+      <div className="bg-primary/3 flex items-center gap-2 border-b border-zinc-100 px-3 py-2 dark:border-zinc-800 dark:bg-orange-950/30">
+        <div className="bg-primary/5 flex size-6 items-center justify-center rounded text-orange-700">
           <HugeiconsIcon icon={GitBranchIcon} size={14} />
         </div>
         <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">Condition</span>
@@ -63,12 +49,10 @@ const ConditionNode = ({ data, id, selected }: NodeProps) => {
 
         <div className="mt-2 flex items-center justify-between">
           <div className="flex items-center gap-1">
-            <div className="size-1.5 rounded-full bg-emerald-500" />
-            <span className="text-[9px] font-medium text-emerald-600">TRUE</span>
+            <span className="text-[9px] font-medium text-emerald-600">True</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="size-1.5 rounded-full bg-red-500" />
-            <span className="text-[9px] font-medium text-red-500">FALSE</span>
+            <span className="text-[9px] font-medium text-red-500">False</span>
           </div>
         </div>
       </div>
@@ -88,7 +72,7 @@ const ConditionNode = ({ data, id, selected }: NodeProps) => {
         style={{ left: '70%' }}
         className="size-2! border-0! bg-red-500!"
       />
-    </div>
+    </NodeWrapper>
   );
 };
 

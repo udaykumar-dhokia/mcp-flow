@@ -30,7 +30,7 @@ const NODE_DEFINITIONS: NodeDefinition[] = [
     label: 'Input',
     description: 'Define tool name, description, and parameters',
     icon: Settings01Icon,
-    color: 'bg-blue-500',
+    color: 'blue-700',
     category: 'Triggers',
     defaultData: { name: 'my_tool', description: '', parameters: [] },
   },
@@ -39,7 +39,7 @@ const NODE_DEFINITIONS: NodeDefinition[] = [
     label: 'HTTP Request',
     description: 'Make HTTP requests to APIs',
     icon: Globe02Icon,
-    color: 'bg-emerald-500',
+    color: 'emerald-700',
     category: 'Actions',
     defaultData: { method: 'GET', url: '', headers: {}, body: '' },
   },
@@ -48,7 +48,7 @@ const NODE_DEFINITIONS: NodeDefinition[] = [
     label: 'Transform',
     description: 'Map and transform JSON data',
     icon: RepeatIcon,
-    color: 'bg-amber-500',
+    color: 'amber-600',
     category: 'Logic',
     defaultData: { mappings: [], expression: '' },
   },
@@ -57,7 +57,7 @@ const NODE_DEFINITIONS: NodeDefinition[] = [
     label: 'Condition',
     description: 'If/Else branching logic',
     icon: GitBranchIcon,
-    color: 'bg-orange-500',
+    color: 'orange-700',
     category: 'Logic',
     defaultData: { field: '', operator: 'equals', value: '' },
   },
@@ -66,7 +66,7 @@ const NODE_DEFINITIONS: NodeDefinition[] = [
     label: 'Output',
     description: 'Define the response returned to the LLM',
     icon: Layout01Icon,
-    color: 'bg-purple-500',
+    color: 'purple-700',
     category: 'Output',
     defaultData: { outputType: 'text' },
   },
@@ -75,7 +75,7 @@ const NODE_DEFINITIONS: NodeDefinition[] = [
     label: 'Secret',
     description: 'Inject API keys and secrets securely',
     icon: SquareLockPasswordIcon,
-    color: 'bg-red-500',
+    color: 'red-700',
     category: 'Security',
     defaultData: { secretKey: '', secretValue: '', description: '' },
   },
@@ -199,7 +199,7 @@ export default function NodePalette({ isCollapsed, onToggle }: NodePaletteProps)
                     className="flex cursor-grab items-center gap-2.5 rounded-md border border-transparent px-2.5 py-2 transition-colors hover:border-zinc-200 hover:bg-zinc-50 active:cursor-grabbing dark:hover:border-zinc-800 dark:hover:bg-zinc-900"
                   >
                     <div
-                      className={`flex size-7 shrink-0 items-center justify-center rounded ${node.color} text-white`}
+                      className={`bg-primary/5 flex text-${node.color} size-7 shrink-0 items-center justify-center rounded`}
                     >
                       <HugeiconsIcon icon={node.icon} size={14} />
                     </div>

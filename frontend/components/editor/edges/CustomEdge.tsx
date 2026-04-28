@@ -3,6 +3,8 @@
 import React from 'react';
 import { BaseEdge, EdgeLabelRenderer, EdgeProps, getSmoothStepPath } from '@xyflow/react';
 import { useFlowStore } from '@/lib/useFlowStore';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Close } from '@hugeicons/core-free-icons';
 
 export default function CustomEdge({
   id,
@@ -67,7 +69,7 @@ export default function CustomEdge({
               }}
               className="flex size-5 items-center justify-center rounded-full border border-zinc-300 bg-white text-[10px] text-zinc-500 transition-colors hover:border-red-400 hover:bg-red-50 hover:text-red-600 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-red-500 dark:hover:bg-red-950 dark:hover:text-red-400"
             >
-              x
+              <HugeiconsIcon icon={Close} />
             </button>
           </div>
         </EdgeLabelRenderer>

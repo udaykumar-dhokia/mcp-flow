@@ -20,6 +20,7 @@ import '@xyflow/react/dist/style.css';
 import InputNode from './nodes/InputNode';
 import HttpNode from './nodes/HttpNode';
 import OutputNode from './nodes/OutputNode';
+import { ExecutionNodeResult, WorkflowExecutionResponse } from '@/types/workflow';
 import TransformNode from './nodes/TransformNode';
 import ConditionNode from './nodes/ConditionNode';
 import SecretNode from './nodes/SecretNode';
@@ -35,10 +36,10 @@ import TemplatePicker from './TemplatePicker';
 
 import { useFlowStore } from '@/lib/useFlowStore';
 import { WorkflowTemplate } from '@/lib/templates';
-import { AnimatePresence, motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { PlayIcon, ZapIcon } from '@hugeicons/core-free-icons';
+import { PlayIcon } from '@hugeicons/core-free-icons';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 
 const nodeTypes = {
   inputNode: InputNode,
@@ -86,6 +87,33 @@ function FlowEditorInner() {
   const [generatedCode, setGeneratedCode] = useState('');
   const [isPaletteCollapsed, setIsPaletteCollapsed] = useState(false);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+
+  const isGraphValid = React.useMemo(() => {
+    const inputNodes = nodes.filter((n) => n.type === 'inputNode');
+    const outputNodes = nodes.filter((n) => n.type === 'outputNode');
+
+    if (inputNodes.length === 0 || outputNodes.length === 0 || edges.length === 0) {
+      return false;
+    }
+
+    const reachableFromInputs = new Set<string>();
+    const queue = inputNodes.map((n) => n.id);
+    queue.forEach((id) => reachableFromInputs.add(id));
+
+    let head = 0;
+    while (head < queue.length) {
+      const currentId = queue[head++];
+      const outgoingEdges = edges.filter((e) => e.source === currentId);
+      for (const edge of outgoingEdges) {
+        if (!reachableFromInputs.has(edge.target)) {
+          reachableFromInputs.add(edge.target);
+          queue.push(edge.target);
+        }
+      }
+    }
+
+    return outputNodes.some((n) => reachableFromInputs.has(n.id));
+  }, [nodes, edges]);
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId) || null;
 
@@ -222,6 +250,7 @@ function FlowEditorInner() {
   };
 
   const onExecuteClick = () => {
+    if (!isGraphValid) return;
     setIsRunModalOpen(true);
   };
 
@@ -241,15 +270,28 @@ function FlowEditorInner() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ graph: { nodes, edges }, input: values }),
       });
-      const data = await response.json();
-      setExecutionResult(data);
+      const data: WorkflowExecutionResponse = await response.json();
+      setExecutionResult(data as Record<string, unknown>);
       setExecutionState('completed');
 
+      const executionResults = data._execution?.nodes || [];
+      const resultMap = new Map<string, ExecutionNodeResult>(
+        executionResults.map((r) => [r.nodeId, r]),
+      );
+
       setExecutionNodeStatuses(
-        nodeOrder.map((n) => ({
-          ...n,
-          status: data.error ? 'error' : ('success' as const),
-        })),
+        nodeOrder.map((n) => {
+          const result = resultMap.get(n.nodeId);
+          if (result) {
+            return {
+              nodeId: n.nodeId,
+              status: result.status as 'success' | 'error',
+              duration: result.duration,
+              error: result.error,
+            };
+          }
+          return n;
+        }),
       );
     } catch {
       setExecutionResult({ error: 'Execution failed' });
@@ -316,72 +358,76 @@ function FlowEditorInner() {
               <Button
                 size="lg"
                 onClick={onExecuteClick}
-                className="h-11 gap-2 rounded-full border border-blue-700 bg-blue-600 px-6 text-white hover:bg-blue-700"
-                disabled={executionState === 'running' || nodes.length === 0}
+                className="border-primary bg-primary hover:bg-primary/80 h-10 gap-2 rounded-xl border px-6 text-white"
+                disabled={executionState === 'running' || !isGraphValid}
               >
                 {executionState === 'running' ? (
                   <div className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                 ) : (
-                  <HugeiconsIcon icon={ZapIcon} size={16} />
+                  <HugeiconsIcon icon={PlayIcon} />
                 )}
-                <span className="text-xs font-bold tracking-widest uppercase">
-                  {executionState === 'running' ? 'Executing...' : 'Execute Workflow'}
+                <span className="text-xs font-bold">
+                  {executionState === 'running' ? 'Executing...' : 'Execute'}
                 </span>
               </Button>
             </Panel>
           </ReactFlow>
         </div>
 
-        <AnimatePresence>
-          {selectedNode && (
-            <motion.div
-              initial={{ x: 50, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: 50, opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              className="absolute top-0 right-0 z-10 h-full w-[380px] border-l border-zinc-200 bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-950"
-            >
-              <ConfigPanel selectedNode={selectedNode} onUpdateNode={onUpdateNode} />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <Dialog
+          open={!!selectedNode}
+          onOpenChange={(open) => !open && selectNode(null)}
+          modal={false}
+        >
+          <DialogContent
+            className="fixed top-12 right-0 left-auto h-[calc(100vh-3rem)] w-full max-w-md translate-x-0 translate-y-0 overflow-hidden rounded-none border-l border-zinc-200 p-0 shadow-none dark:border-zinc-800 dark:bg-zinc-950"
+            hideOverlay
+            showCloseButton={false}
+          >
+            <ConfigPanel selectedNode={selectedNode} onUpdateNode={onUpdateNode} />
+          </DialogContent>
+        </Dialog>
 
-        <AnimatePresence>
-          {(executionResult || executionState === 'running') && (
-            <motion.div
-              initial={{ x: 50, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: 50, opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              className="absolute top-0 right-0 z-20 flex h-full w-[450px] flex-col border-l border-zinc-200 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-950"
-            >
-              <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3 dark:border-zinc-800">
-                <div className="flex items-center gap-2">
-                  <HugeiconsIcon icon={PlayIcon} size={14} className="text-blue-500" />
-                  <h3 className="text-xs font-bold tracking-wider uppercase">Execution Results</h3>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-7 text-zinc-400 hover:text-zinc-600"
-                  onClick={() => {
-                    setExecutionResult(null);
-                    resetExecution();
-                  }}
-                >
-                  <span className="text-sm">x</span>
-                </Button>
+        <Dialog
+          open={!!executionResult || executionState === 'running'}
+          onOpenChange={(open) => {
+            if (!open) {
+              setExecutionResult(null);
+              resetExecution();
+            }
+          }}
+          modal={false}
+        >
+          <DialogContent
+            className="fixed top-12 right-0 left-auto flex h-[calc(100vh-3rem)] w-[450px] max-w-lg translate-x-0 translate-y-0 flex-col rounded-none border-l border-zinc-200 bg-white p-0 shadow-none dark:border-zinc-800 dark:bg-zinc-950"
+            hideOverlay
+            showCloseButton={false}
+          >
+            <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3 dark:border-zinc-800">
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-bold">Execution Results</h3>
               </div>
-              <div className="flex-1 overflow-auto">
-                <WidgetPreview
-                  result={executionResult}
-                  isRunning={executionState === 'running'}
-                  onRun={() => setIsRunModalOpen(true)}
-                />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7 text-zinc-400 hover:text-zinc-600"
+                onClick={() => {
+                  setExecutionResult(null);
+                  resetExecution();
+                }}
+              >
+                <span className="text-sm">x</span>
+              </Button>
+            </div>
+            <div className="flex-1 overflow-auto">
+              <WidgetPreview
+                result={executionResult}
+                isRunning={executionState === 'running'}
+                onRun={() => setIsRunModalOpen(true)}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <CodeExportModal
@@ -400,6 +446,7 @@ function FlowEditorInner() {
 
       <TemplatePicker
         isOpen={showTemplatePicker}
+        onClose={() => setShowTemplatePicker(false)}
         onSelectTemplate={handleSelectTemplate}
         onStartFresh={handleStartFresh}
       />

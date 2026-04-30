@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../prisma.service';
 
 import {
   Graph,
@@ -6,7 +7,11 @@ import {
   GraphEdge,
   NodeParameter,
   TransformMapping,
+  WorkflowBundle,
+  McpPrompt,
+  McpResource,
 } from './dto/graph.dto';
+import { ChatMessageDto } from './dto/workflow.dto';
 
 interface NodeExecutionResult {
   nodeId: string;
@@ -16,20 +21,206 @@ interface NodeExecutionResult {
   error?: string;
 }
 
+interface OllamaToolCall {
+  id?: string;
+  function?: {
+    name?: string;
+    arguments?: Record<string, unknown> | string;
+  };
+}
+
+interface OllamaMessage {
+  role?: string;
+  content?: string;
+  tool_calls?: OllamaToolCall[];
+}
+
+interface OllamaChatResponse {
+  message?: OllamaMessage;
+  [key: string]: unknown;
+}
+
 @Injectable()
 export class WorkflowService {
   private readonly logger = new Logger(WorkflowService.name);
+
+  constructor(private readonly prisma: PrismaService) {}
+
+  async listWorkflows() {
+    const project = await this.ensureDefaultProject();
+    const workflows = await this.prisma.workflow.findMany({
+      where: { projectId: project.id },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return workflows.map((workflow) => {
+      const bundle = this.parseBundle(workflow.graphJson);
+      return {
+        id: workflow.id,
+        name: bundle.name,
+        graph: bundle.graph,
+        resources: bundle.resources,
+        prompts: bundle.prompts,
+        version: workflow.version,
+        createdAt: workflow.createdAt,
+      };
+    });
+  }
+
+  async createWorkflow(bundle: Partial<WorkflowBundle>) {
+    const project = await this.ensureDefaultProject();
+    const stored = this.normalizeBundle(bundle);
+    const workflow = await this.prisma.workflow.create({
+      data: {
+        projectId: project.id,
+        graphJson: JSON.stringify(stored),
+      },
+    });
+
+    return { id: workflow.id, version: workflow.version, ...stored };
+  }
+
+  async getWorkflow(id: string) {
+    const workflow = await this.prisma.workflow.findUnique({ where: { id } });
+    if (!workflow) throw new NotFoundException('Workflow not found');
+    return {
+      id: workflow.id,
+      version: workflow.version,
+      createdAt: workflow.createdAt,
+      ...this.parseBundle(workflow.graphJson),
+    };
+  }
+
+  async updateWorkflow(id: string, bundle: Partial<WorkflowBundle>) {
+    const current = await this.getWorkflow(id);
+    const stored = this.normalizeBundle({
+      name: bundle.name ?? current.name,
+      graph: bundle.graph ?? current.graph,
+      resources: bundle.resources ?? current.resources,
+      prompts: bundle.prompts ?? current.prompts,
+    });
+
+    const workflow = await this.prisma.workflow.update({
+      where: { id },
+      data: {
+        graphJson: JSON.stringify(stored),
+        version: { increment: 1 },
+      },
+    });
+
+    return { id: workflow.id, version: workflow.version, ...stored };
+  }
+
+  async deleteWorkflow(id: string) {
+    await this.prisma.workflow.delete({ where: { id } });
+    return { ok: true };
+  }
 
   async execute(
     graph: Graph,
     input: Record<string, unknown>,
   ): Promise<Record<string, unknown>> {
+    return this.executeFromInput(graph, input);
+  }
+
+  async chatWithOllama({
+    graph,
+    input = {},
+    resources = [],
+    prompts = [],
+    messages,
+    model = 'llama3.1',
+    ollamaUrl = 'http://localhost:11434',
+  }: {
+    graph: Graph;
+    input?: Record<string, unknown>;
+    resources?: McpResource[];
+    prompts?: McpPrompt[];
+    messages: ChatMessageDto[];
+    model?: string;
+    ollamaUrl?: string;
+  }) {
+    const tools = graph.nodes
+      .filter((node) => node.type === 'inputNode')
+      .map((node) => this.toOllamaTool(node));
+
+    const systemContext = this.buildMcpContext(resources, prompts);
+    const requestMessages = systemContext
+      ? [{ role: 'system', content: systemContext }, ...messages]
+      : messages;
+
+    const first = await this.callOllama(ollamaUrl, {
+      model,
+      messages: requestMessages,
+      tools,
+      stream: false,
+    });
+
+    const assistantMessage = first.message || {
+      role: 'assistant',
+      content: '',
+    };
+    const toolCalls = assistantMessage.tool_calls || [];
+    if (toolCalls.length === 0) {
+      return {
+        message: assistantMessage,
+        toolCalls: [],
+        raw: first,
+      };
+    }
+
+    const executedToolMessages: ChatMessageDto[] = [];
+    const toolResults: Record<string, unknown>[] = [];
+
+    for (const call of toolCalls) {
+      const name = call.function?.name;
+      const args = this.parseToolArguments(call.function?.arguments);
+      if (!name) continue;
+
+      const result = await this.executeFromInput(
+        graph,
+        { ...input, ...args },
+        name,
+      );
+      toolResults.push({ name, arguments: args, result });
+      executedToolMessages.push({
+        role: 'tool',
+        tool_call_id: call.id || name,
+        name,
+        content: JSON.stringify(result),
+      });
+    }
+
+    const final = await this.callOllama(ollamaUrl, {
+      model,
+      messages: [...requestMessages, assistantMessage, ...executedToolMessages],
+      stream: false,
+    });
+
+    return {
+      message: final.message,
+      toolCalls: toolResults,
+      raw: final,
+    };
+  }
+
+  private async executeFromInput(
+    graph: Graph,
+    input: Record<string, unknown>,
+    toolName?: string,
+  ): Promise<Record<string, unknown>> {
     const { nodes, edges } = graph;
     const nodeResults: NodeExecutionResult[] = [];
 
-    const inputNode = nodes.find((n) => n.type === 'inputNode');
+    const inputNode = nodes.find(
+      (n) => n.type === 'inputNode' && (!toolName || n.data.name === toolName),
+    );
     if (!inputNode) {
-      throw new Error('Input node not found in graph');
+      throw new Error(
+        toolName
+          ? `Tool "${toolName}" not found in graph`
+          : 'Input node not found in graph',
+      );
     }
 
     let currentState = { ...input };
@@ -125,6 +316,143 @@ export class WorkflowService {
     }
 
     return { data: currentState, _execution: { nodes: nodeResults } };
+  }
+
+  private async ensureDefaultProject() {
+    const user = await this.prisma.user.upsert({
+      where: { email: 'local@mcp-flow.dev' },
+      update: {},
+      create: {
+        email: 'local@mcp-flow.dev',
+        name: 'Local MCP-Flow User',
+      },
+    });
+
+    return this.prisma.project.upsert({
+      where: { slug: 'local-workspace' },
+      update: {},
+      create: {
+        userId: user.id,
+        name: 'Local Workspace',
+        slug: 'local-workspace',
+      },
+    });
+  }
+
+  private normalizeBundle(bundle: Partial<WorkflowBundle>): WorkflowBundle {
+    return {
+      name: bundle.name?.trim() || 'Untitled Workflow',
+      graph: bundle.graph || { nodes: [], edges: [] },
+      resources: bundle.resources || [],
+      prompts: bundle.prompts || [],
+    };
+  }
+
+  private parseBundle(raw: string): WorkflowBundle {
+    try {
+      const parsed = JSON.parse(raw) as Partial<WorkflowBundle> | Graph;
+      if ('nodes' in parsed && 'edges' in parsed) {
+        return this.normalizeBundle({ graph: parsed });
+      }
+      return this.normalizeBundle(parsed);
+    } catch {
+      return this.normalizeBundle({});
+    }
+  }
+
+  private toOllamaTool(node: GraphNode) {
+    const parameters = node.data.parameters || [];
+    const properties = Object.fromEntries(
+      parameters.map((param: NodeParameter) => [
+        param.name,
+        {
+          type:
+            param.type === 'number' || param.type === 'boolean'
+              ? param.type
+              : 'string',
+          description: param.description || '',
+        },
+      ]),
+    );
+    const required = parameters
+      .filter((param: NodeParameter) => param.required !== false)
+      .map((param: NodeParameter) => param.name);
+
+    return {
+      type: 'function',
+      function: {
+        name: node.data.name || node.id,
+        description: node.data.description || 'Generated MCP-Flow tool',
+        parameters: {
+          type: 'object',
+          properties,
+          required,
+        },
+      },
+    };
+  }
+
+  private buildMcpContext(resources: McpResource[], prompts: McpPrompt[]) {
+    const lines: string[] = [];
+    if (resources.length > 0) {
+      lines.push('Available MCP resources:');
+      resources.forEach((resource) => {
+        lines.push(
+          `- ${resource.name} (${resource.uri}, ${resource.mimeType || 'text/plain'}): ${
+            resource.description || resource.title || 'No description'
+          }`,
+        );
+      });
+    }
+    if (prompts.length > 0) {
+      lines.push('Available MCP prompts:');
+      prompts.forEach((prompt) => {
+        lines.push(
+          `- ${prompt.name}: ${prompt.description || prompt.template.slice(0, 80)}`,
+        );
+      });
+    }
+    return lines.join('\n');
+  }
+
+  private parseToolArguments(
+    value: Record<string, unknown> | string | undefined,
+  ): Record<string, unknown> {
+    if (!value) return {};
+    if (typeof value !== 'string') return value;
+    try {
+      return JSON.parse(value) as Record<string, unknown>;
+    } catch {
+      return {};
+    }
+  }
+
+  private async callOllama(
+    ollamaUrl: string,
+    body: Record<string, unknown>,
+  ): Promise<OllamaChatResponse> {
+    const baseUrl = ollamaUrl.replace(/\/$/, '');
+    let response: Response;
+    try {
+      response = await fetch(`${baseUrl}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    } catch {
+      throw new Error(
+        'Could not reach Ollama. Make sure Ollama is running and the URL is correct.',
+      );
+    }
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(
+        `Ollama returned ${response.status}: ${text || response.statusText}`,
+      );
+    }
+
+    return (await response.json()) as OllamaChatResponse;
   }
 
   private topologicalSort(

@@ -6,11 +6,17 @@ import {
   GraphEdge,
   NodeParameter,
   TransformMapping,
+  McpPrompt,
+  McpResource,
 } from './dto/graph.dto';
 
 @Injectable()
 export class GeneratorService {
-  generate(graph: Graph): string {
+  generate(
+    graph: Graph,
+    resources: McpResource[] = [],
+    prompts: McpPrompt[] = [],
+  ): string {
     const { nodes, edges } = graph;
 
     const inputNodes = nodes.filter((n) => n.type === 'inputNode');
@@ -44,6 +50,8 @@ const server = new MCPServer({
 });
 
 ${tools.join('\n\n')}
+${this.generateResources(resources)}
+${this.generatePrompts(prompts)}
 
 server.listen().then(() => console.log("MCP server running"));
 `;
@@ -232,6 +240,71 @@ ${bodyLines}
 );`;
   }
 
+  private generateResources(resources: McpResource[]): string {
+    if (resources.length === 0) return '';
+
+    return resources
+      .filter((resource) => resource.name && resource.uri)
+      .map((resource) => {
+        const content =
+          resource.mimeType === 'application/json'
+            ? `object(${this.safeJson(resource.content)})`
+            : `text(${JSON.stringify(resource.content || '')})`;
+
+        return `server.resource(
+  {
+    name: ${JSON.stringify(resource.name)},
+    uri: ${JSON.stringify(resource.uri)},
+    title: ${JSON.stringify(resource.title || resource.name)},
+    description: ${JSON.stringify(resource.description || '')},
+    mimeType: ${JSON.stringify(resource.mimeType || 'text/plain')},
+  },
+  async () => ${content}
+);`;
+      })
+      .join('\n\n');
+  }
+
+  private generatePrompts(prompts: McpPrompt[]): string {
+    if (prompts.length === 0) return '';
+
+    return prompts
+      .filter((prompt) => prompt.name && prompt.template)
+      .map((prompt) => {
+        const args = prompt.arguments || [];
+        const zodFields = args
+          .map((arg) => {
+            let zodType = 'z.string()';
+            if (arg.type === 'number') zodType = 'z.number()';
+            if (arg.type === 'boolean') zodType = 'z.boolean()';
+            if (arg.defaultValue !== undefined && arg.defaultValue !== '')
+              zodType += `.default(${JSON.stringify(arg.defaultValue)})`;
+            if (arg.required === false) zodType += '.optional()';
+            if (arg.description)
+              zodType += `.describe(${JSON.stringify(arg.description)})`;
+            return `      ${arg.name}: ${zodType},`;
+          })
+          .join('\n');
+
+        return `server.prompt(
+  {
+    name: ${JSON.stringify(prompt.name)},
+    description: ${JSON.stringify(prompt.description || '')},
+    schema: z.object({
+${zodFields}
+    }),
+  },
+  async (args) => {
+    const rendered = ${this.templateLiteral(prompt.template)};
+    return {
+      messages: [{ role: ${JSON.stringify(prompt.role || 'system')}, content: rendered }],
+    };
+  }
+);`;
+      })
+      .join('\n\n');
+  }
+
   private generateNodeChain(nodes: GraphNode[]): string {
     const lines: string[] = [];
 
@@ -391,5 +464,24 @@ return object(data);`;
       .replace(/\{\{input\.(.*?)\}\}/g, '${params.$1}')
       .replace(/\{\{secret\.(.*?)\}\}/g, '${process.env["$1"]}')
       .replace(/\{\{(.*?)\}\}/g, '${data.$1}');
+  }
+
+  private safeJson(raw: string): string {
+    try {
+      return JSON.stringify(JSON.parse(raw || '{}'));
+    } catch {
+      return JSON.stringify({ value: raw || '' });
+    }
+  }
+
+  private templateLiteral(value: string): string {
+    return `\`${value
+      .replace(/\\/g, '\\\\')
+      .replace(/`/g, '\\`')
+      .replace(/\$\{/g, '\\${')
+      .replace(/\{\{(.*?)\}\}/g, (_match, key: string) => {
+        const cleanKey = key.trim();
+        return `\${String(args[${JSON.stringify(cleanKey)}] ?? "")}`;
+      })}\``;
   }
 }

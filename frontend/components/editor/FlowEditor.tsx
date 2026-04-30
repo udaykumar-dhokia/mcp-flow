@@ -33,6 +33,8 @@ import CodeExportModal from './CodeExportModal';
 import RunWorkflowModal from './RunWorkflowModal';
 import NodePalette from './NodePalette';
 import TemplatePicker from './TemplatePicker';
+import McpAssetsPanel from './McpAssetsPanel';
+import OllamaChatPanel from './OllamaChatPanel';
 
 import { useFlowStore } from '@/lib/useFlowStore';
 import { WorkflowTemplate } from '@/lib/templates';
@@ -75,11 +77,13 @@ function FlowEditorInner() {
     deleteSelected,
     executionState,
     executionResult,
+    resources,
+    prompts,
     setExecutionResult,
     setExecutionState,
     setExecutionNodeStatuses,
     resetExecution,
-    loadFromLocalStorage,
+    loadWorkflows,
   } = useFlowStore();
 
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -87,6 +91,8 @@ function FlowEditorInner() {
   const [generatedCode, setGeneratedCode] = useState('');
   const [isPaletteCollapsed, setIsPaletteCollapsed] = useState(false);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [showAssetsPanel, setShowAssetsPanel] = useState(false);
+  const [showChatPanel, setShowChatPanel] = useState(false);
 
   const isGraphValid = React.useMemo(() => {
     const inputNodes = nodes.filter((n) => n.type === 'inputNode');
@@ -118,17 +124,19 @@ function FlowEditorInner() {
   const selectedNode = nodes.find((n) => n.id === selectedNodeId) || null;
 
   useEffect(() => {
-    loadFromLocalStorage();
+    void loadWorkflows();
     const hasExisting = localStorage.getItem('mcp-flow-workspace');
     if (!hasExisting) {
       setTimeout(() => setShowTemplatePicker(true), 0);
     }
-  }, [loadFromLocalStorage]);
+  }, [loadWorkflows]);
 
   const handleSelectTemplate = (template: WorkflowTemplate) => {
     useFlowStore.getState().setNodes(template.nodes);
     useFlowStore.getState().setEdges(template.edges);
     useFlowStore.getState().setWorkflowName(template.name);
+    useFlowStore.getState().setResources([]);
+    useFlowStore.getState().setPrompts([]);
     useFlowStore.getState().saveToLocalStorage();
     setShowTemplatePicker(false);
   };
@@ -239,7 +247,7 @@ function FlowEditorInner() {
       const response = await fetch('http://localhost:3001/workflow/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ graph: { nodes, edges } }),
+        body: JSON.stringify({ graph: { nodes, edges }, resources, prompts }),
       });
       const data = await response.json();
       setGeneratedCode(data.code);
@@ -307,7 +315,12 @@ function FlowEditorInner() {
 
   return (
     <div className="flex h-screen w-full flex-col bg-zinc-50 dark:bg-zinc-950">
-      <EditorHeader onExport={onExport} onShowTemplates={() => setShowTemplatePicker(true)} />
+      <EditorHeader
+        onExport={onExport}
+        onShowTemplates={() => setShowTemplatePicker(true)}
+        onShowAssets={() => setShowAssetsPanel(true)}
+        onShowChat={() => setShowChatPanel(true)}
+      />
 
       <div className="relative flex flex-1 overflow-hidden">
         <NodePalette
@@ -450,6 +463,10 @@ function FlowEditorInner() {
         onSelectTemplate={handleSelectTemplate}
         onStartFresh={handleStartFresh}
       />
+
+      <McpAssetsPanel isOpen={showAssetsPanel} onClose={() => setShowAssetsPanel(false)} />
+
+      <OllamaChatPanel isOpen={showChatPanel} onClose={() => setShowChatPanel(false)} />
     </div>
   );
 }

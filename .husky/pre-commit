@@ -1,1 +1,2 @@
-npx lint-staged
+export PATH="/c/Program Files/nodejs:/c/Users/udayk/AppData/Local/pnpm:$PATH"
+pnpm exec lint-staged

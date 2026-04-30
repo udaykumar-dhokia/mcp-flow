@@ -1,1 +1,2 @@
-npx commitlint --edit $1
+export PATH="/c/Program Files/nodejs:/c/Users/udayk/AppData/Local/pnpm:$PATH"
+pnpm exec commitlint --edit $1

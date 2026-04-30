@@ -11,6 +11,33 @@ export interface TransformMapping {
   to: string;
 }
 
+export interface McpResource {
+  id: string;
+  name: string;
+  uri: string;
+  title?: string;
+  description?: string;
+  mimeType: string;
+  content: string;
+}
+
+export interface McpPromptArgument {
+  name: string;
+  type: string;
+  description?: string;
+  required?: boolean;
+  defaultValue?: unknown;
+}
+
+export interface McpPrompt {
+  id: string;
+  name: string;
+  description?: string;
+  arguments: McpPromptArgument[];
+  template: string;
+  role: 'system' | 'user' | 'assistant';
+}
+
 export interface GraphNodeData {
   [key: string]: unknown;
 
@@ -40,7 +67,7 @@ export interface GraphNodeData {
 
 export interface GraphNode {
   id: string;
-  type: string;
+  type?: string;
   data: GraphNodeData;
   position?: { x: number; y: number };
   positionAbsolute?: { x: number; y: number };
@@ -54,8 +81,8 @@ export interface GraphEdge {
   id: string;
   source: string;
   target: string;
-  sourceHandle?: string;
-  targetHandle?: string;
+  sourceHandle?: string | null;
+  targetHandle?: string | null;
   type?: string;
   selected?: boolean;
   animated?: boolean;
@@ -79,4 +106,18 @@ export interface WorkflowExecutionResponse {
   _execution?: {
     nodes: ExecutionNodeResult[];
   };
+}
+
+export interface SavedWorkflow {
+  id: string;
+  name: string;
+  graph: Graph;
+  resources: McpResource[];
+  prompts: McpPrompt[];
+  version?: number;
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant' | 'system' | 'tool';
+  content: string;
 }

@@ -11,6 +11,7 @@ import {
   NodeChange,
   EdgeChange,
 } from '@xyflow/react';
+import { McpPrompt, McpResource, SavedWorkflow, ChatConfig } from '@/types/workflow';
 
 interface HistoryEntry {
   nodes: Node[];
@@ -27,8 +28,15 @@ interface ExecutionNodeStatus {
 interface FlowState {
   nodes: Node[];
   edges: Edge[];
+  workflows: SavedWorkflow[];
+  currentWorkflowId: string | null;
   selectedNodeId: string | null;
   workflowName: string;
+  resources: McpResource[];
+  prompts: McpPrompt[];
+  isSaving: boolean;
+  persistenceError: string | null;
+  chatConfig: ChatConfig | null;
 
   executionState: 'idle' | 'running' | 'completed' | 'error';
   executionNodeStatuses: ExecutionNodeStatus[];
@@ -50,7 +58,15 @@ interface FlowState {
   updateNodeData: (nodeId: string, data: Record<string, unknown>) => void;
   selectNode: (nodeId: string | null) => void;
   setWorkflowName: (name: string) => void;
+  setResources: (resources: McpResource[]) => void;
+  setPrompts: (prompts: McpPrompt[]) => void;
+  setChatConfig: (config: ChatConfig) => void;
   clearCanvas: () => void;
+  createWorkflow: (name?: string) => Promise<void>;
+  saveWorkflow: () => Promise<void>;
+  loadWorkflows: () => Promise<void>;
+  switchWorkflow: (id: string) => Promise<void>;
+  deleteWorkflow: (id: string) => Promise<void>;
 
   undo: () => void;
   redo: () => void;
@@ -68,6 +84,7 @@ interface FlowState {
 
 const STORAGE_KEY = 'mcp-flow-workspace';
 const MAX_HISTORY = 50;
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:2815';
 
 function pushHistory(state: FlowState): Partial<FlowState> {
   const entry: HistoryEntry = {
@@ -81,8 +98,15 @@ function pushHistory(state: FlowState): Partial<FlowState> {
 export const useFlowStore = create<FlowState>((set, get) => ({
   nodes: [],
   edges: [],
+  workflows: [],
+  currentWorkflowId: null,
   selectedNodeId: null,
   workflowName: 'Untitled Workflow',
+  resources: [],
+  prompts: [],
+  isSaving: false,
+  persistenceError: null,
+  chatConfig: null,
 
   executionState: 'idle',
   executionNodeStatuses: [],
@@ -174,7 +198,27 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   selectNode: (nodeId) => set({ selectedNodeId: nodeId }),
 
   setWorkflowName: (name) => {
-    set({ workflowName: name });
+    const state = get();
+    set({
+      workflowName: name,
+      workflows: state.workflows.map((workflow) =>
+        workflow.id === state.currentWorkflowId ? { ...workflow, name } : workflow,
+      ),
+    });
+    get().saveToLocalStorage();
+  },
+
+  setResources: (resources) => {
+    set({ resources });
+    get().saveToLocalStorage();
+  },
+
+  setPrompts: (prompts) => {
+    set({ prompts });
+    get().saveToLocalStorage();
+  },
+  setChatConfig: (chatConfig) => {
+    set({ chatConfig });
     get().saveToLocalStorage();
   },
 
@@ -184,8 +228,228 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       ...pushHistory(state),
       nodes: [],
       edges: [],
+      resources: [],
+      prompts: [],
       selectedNodeId: null,
     });
+    get().saveToLocalStorage();
+  },
+
+  createWorkflow: async (name = 'Untitled Workflow') => {
+    const state = get();
+    const emptyGraph = { nodes: [], edges: [] };
+    set({ isSaving: true, persistenceError: null });
+    try {
+      const response = await fetch(`${API_BASE}/workflow`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          graph: emptyGraph,
+          resources: [],
+          prompts: [],
+          chatConfig: null,
+        }),
+      });
+      if (!response.ok) throw new Error('Could not create workflow');
+      const workflow: SavedWorkflow = await response.json();
+      set({
+        workflows: [...state.workflows, workflow],
+        currentWorkflowId: workflow.id,
+        workflowName: workflow.name,
+        nodes: workflow.graph.nodes as Node[],
+        edges: workflow.graph.edges as Edge[],
+        resources: workflow.resources,
+        prompts: workflow.prompts,
+        chatConfig: workflow.chatConfig || null,
+        selectedNodeId: null,
+        past: [],
+        future: [],
+      });
+      get().saveToLocalStorage();
+    } catch (error) {
+      const id = `local-${Date.now()}`;
+      const workflow: SavedWorkflow = {
+        id,
+        name,
+        graph: emptyGraph,
+        resources: [],
+        prompts: [],
+      };
+      set({
+        workflows: [...state.workflows, workflow],
+        currentWorkflowId: id,
+        workflowName: name,
+        nodes: [],
+        edges: [],
+        resources: [],
+        prompts: [],
+        chatConfig: null,
+        persistenceError: error instanceof Error ? error.message : 'Could not create workflow',
+      });
+      get().saveToLocalStorage();
+    } finally {
+      set({ isSaving: false });
+    }
+  },
+
+  saveWorkflow: async () => {
+    const state = get();
+    const payload = {
+      name: state.workflowName,
+      graph: { nodes: state.nodes, edges: state.edges },
+      resources: state.resources,
+      prompts: state.prompts,
+      chatConfig: state.chatConfig,
+    };
+
+    if (!state.currentWorkflowId || state.currentWorkflowId.startsWith('local-')) {
+      set({ isSaving: true, persistenceError: null });
+      try {
+        const response = await fetch(`${API_BASE}/workflow`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) throw new Error('Could not save workflow');
+        const workflow: SavedWorkflow = await response.json();
+        set({
+          workflows: [
+            ...state.workflows.filter((item) => item.id !== state.currentWorkflowId),
+            workflow,
+          ],
+          currentWorkflowId: workflow.id,
+        });
+        get().saveToLocalStorage();
+      } catch (error) {
+        set({
+          workflows: state.workflows.map((item) =>
+            item.id === state.currentWorkflowId ? { ...item, ...payload } : item,
+          ),
+          persistenceError: error instanceof Error ? error.message : 'Could not save workflow',
+        });
+      } finally {
+        set({ isSaving: false });
+      }
+      return;
+    }
+
+    set({ isSaving: true, persistenceError: null });
+    try {
+      const response = await fetch(`${API_BASE}/workflow/${state.currentWorkflowId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) throw new Error('Could not save workflow');
+      const workflow: SavedWorkflow = await response.json();
+      set({
+        workflows: state.workflows.map((item) => (item.id === workflow.id ? workflow : item)),
+      });
+      get().saveToLocalStorage();
+    } catch (error) {
+      set({
+        workflows: state.workflows.map((item) =>
+          item.id === state.currentWorkflowId ? { ...item, ...payload } : item,
+        ),
+        persistenceError: error instanceof Error ? error.message : 'Could not save workflow',
+      });
+      get().saveToLocalStorage();
+    } finally {
+      set({ isSaving: false });
+    }
+  },
+
+  loadWorkflows: async () => {
+    get().loadFromLocalStorage();
+    try {
+      const response = await fetch(`${API_BASE}/workflow`);
+      if (!response.ok) throw new Error('Could not load workflows');
+      const workflows: SavedWorkflow[] = await response.json();
+      if (workflows.length === 0) {
+        await get().createWorkflow('Untitled Workflow');
+        return;
+      }
+      const currentId = get().currentWorkflowId;
+      const selected = workflows.find((workflow) => workflow.id === currentId) || workflows[0];
+      set({
+        workflows,
+        currentWorkflowId: selected.id,
+        workflowName: selected.name,
+        nodes: selected.graph.nodes as Node[],
+        edges: selected.graph.edges as Edge[],
+        resources: selected.resources || [],
+        prompts: selected.prompts || [],
+        chatConfig: selected.chatConfig || null,
+        persistenceError: null,
+        past: [],
+        future: [],
+      });
+      get().saveToLocalStorage();
+    } catch (error) {
+      const state = get();
+      const localWorkflow: SavedWorkflow = {
+        id: state.currentWorkflowId || 'local-default',
+        name: state.workflowName,
+        graph: { nodes: state.nodes, edges: state.edges },
+        resources: state.resources,
+        prompts: state.prompts,
+      };
+      set({
+        workflows: state.workflows.length > 0 ? state.workflows : [localWorkflow],
+        currentWorkflowId: state.currentWorkflowId || localWorkflow.id,
+        persistenceError: error instanceof Error ? error.message : 'Backend unavailable',
+      });
+    }
+  },
+
+  switchWorkflow: async (id) => {
+    await get().saveWorkflow();
+    const workflow = get().workflows.find((item) => item.id === id);
+    if (!workflow) return;
+    set({
+      currentWorkflowId: workflow.id,
+      workflowName: workflow.name,
+      nodes: workflow.graph.nodes as Node[],
+      edges: workflow.graph.edges as Edge[],
+      resources: workflow.resources || [],
+      prompts: workflow.prompts || [],
+      chatConfig: workflow.chatConfig || null,
+      selectedNodeId: null,
+      past: [],
+      future: [],
+    });
+    get().saveToLocalStorage();
+  },
+
+  deleteWorkflow: async (id) => {
+    const state = get();
+    const nextWorkflows = state.workflows.filter((workflow) => workflow.id !== id);
+    if (!id.startsWith('local-')) {
+      try {
+        await fetch(`${API_BASE}/workflow/${id}`, { method: 'DELETE' });
+      } catch {
+        set({ persistenceError: 'Could not delete workflow from the backend' });
+      }
+    }
+
+    set({ workflows: nextWorkflows });
+    if (state.currentWorkflowId === id) {
+      const next = nextWorkflows[0];
+      if (next) {
+        set({
+          currentWorkflowId: next.id,
+          workflowName: next.name,
+          nodes: next.graph.nodes as Node[],
+          edges: next.graph.edges as Edge[],
+          resources: next.resources || [],
+          prompts: next.prompts || [],
+          chatConfig: next.chatConfig || null,
+        });
+      } else {
+        await get().createWorkflow('Untitled Workflow');
+      }
+    }
     get().saveToLocalStorage();
   },
 
@@ -247,6 +511,11 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         nodes: state.nodes,
         edges: state.edges,
         workflowName: state.workflowName,
+        workflows: state.workflows,
+        currentWorkflowId: state.currentWorkflowId,
+        resources: state.resources,
+        prompts: state.prompts,
+        chatConfig: state.chatConfig,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch {
@@ -264,6 +533,11 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           nodes: data.nodes,
           edges: data.edges,
           workflowName: data.workflowName || 'Untitled Workflow',
+          workflows: data.workflows || [],
+          currentWorkflowId: data.currentWorkflowId || null,
+          resources: data.resources || [],
+          prompts: data.prompts || [],
+          chatConfig: data.chatConfig || null,
         });
       }
     } catch {

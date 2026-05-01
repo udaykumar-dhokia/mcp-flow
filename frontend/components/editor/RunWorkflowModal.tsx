@@ -64,7 +64,7 @@ export default function RunWorkflowModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-fit min-w-[320px] overflow-hidden border-zinc-200 p-0 dark:border-zinc-800 dark:bg-zinc-950">
+      <DialogContent className="w-[95vw] max-w-lg overflow-hidden border-zinc-200 p-0 sm:w-[400px] dark:border-zinc-800 dark:bg-zinc-950">
         <DialogHeader className="flex flex-row items-center gap-3 border-b border-zinc-100 px-5 py-4 dark:border-zinc-800">
           <div className="flex flex-col gap-0.5">
             <DialogTitle className="text-sm font-semibold">Run Workflow</DialogTitle>

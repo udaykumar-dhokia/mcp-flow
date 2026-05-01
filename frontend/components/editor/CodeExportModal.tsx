@@ -5,7 +5,13 @@ import { HugeiconsIcon } from '@hugeicons/react';
 import { CopyIcon, CheckmarkCircle01Icon, Download01Icon } from '@hugeicons/core-free-icons';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 
 interface CodeExportModalProps {
   isOpen: boolean;
@@ -52,9 +58,14 @@ export default function CodeExportModal({ isOpen, onClose, code }: CodeExportMod
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-fit min-w-[50vw] overflow-hidden border-zinc-200 p-0 dark:border-zinc-800 dark:bg-zinc-950">
-        <DialogHeader className="flex flex-row items-center justify-between border-b border-zinc-100 px-5 py-3 dark:border-zinc-800">
-          <DialogTitle className="text-sm font-semibold">Generated MCP Server</DialogTitle>
+      <DialogContent className="w-[95vw] max-w-3xl overflow-hidden border-zinc-200 p-0 sm:w-[50vw] dark:border-zinc-800 dark:bg-zinc-950">
+        <DialogHeader className="flex flex-row items-center gap-3 border-b border-zinc-100 px-5 py-4 dark:border-zinc-800">
+          <div className="flex flex-col gap-0.5">
+            <DialogTitle className="text-sm font-semibold">Generated MCP Server</DialogTitle>
+            <DialogDescription className="text-[10px] text-zinc-500">
+              Download or copy your server code
+            </DialogDescription>
+          </div>
         </DialogHeader>
 
         <Tabs defaultValue="server" className="flex flex-col">
@@ -96,7 +107,7 @@ export default function CodeExportModal({ isOpen, onClose, code }: CodeExportMod
                 Download
               </Button>
             </div>
-            <div className="max-h-87.5 overflow-y-auto rounded-lg bg-zinc-50 p-4 dark:bg-zinc-900">
+            <div className="max-h-[50vh] overflow-y-auto rounded-lg bg-zinc-50 p-4 dark:bg-zinc-900">
               <pre className="font-mono text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-400">
                 {code}
               </pre>
@@ -124,7 +135,7 @@ export default function CodeExportModal({ isOpen, onClose, code }: CodeExportMod
                 Download
               </Button>
             </div>
-            <div className="max-h-87.5 overflow-y-auto rounded-lg bg-zinc-50 p-4 dark:bg-zinc-900">
+            <div className="max-h-[50vh] overflow-y-auto rounded-lg bg-zinc-50 p-4 dark:bg-zinc-900">
               <pre className="font-mono text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-400">
                 {PACKAGE_JSON}
               </pre>
@@ -132,7 +143,7 @@ export default function CodeExportModal({ isOpen, onClose, code }: CodeExportMod
           </TabsContent>
         </Tabs>
 
-        <div className="border-t border-zinc-100 px-5 py-4 dark:border-zinc-800">
+        <div className="border-t border-zinc-100 bg-zinc-50/50 px-5 py-4 dark:border-zinc-800 dark:bg-zinc-900/50">
           <h4 className="mb-1.5 text-[10px] font-bold tracking-wider text-zinc-500 uppercase">
             Quick Start
           </h4>

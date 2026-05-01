@@ -10,8 +10,15 @@ import {
   ChipIcon,
 } from '@hugeicons/core-free-icons';
 import { WORKFLOW_TEMPLATES, WorkflowTemplate } from '@/lib/templates';
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 
+// ... (imports remain the same above this)
 interface TemplatePickerProps {
   isOpen: boolean;
   onClose: () => void;
@@ -46,24 +53,20 @@ export default function TemplatePicker({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-fit min-w-[60vw] overflow-hidden border-zinc-200 p-0 dark:border-zinc-800 dark:bg-zinc-950">
-        <div className="border-b border-zinc-100 px-8 pt-8 pb-6 dark:border-zinc-800">
-          <div className="mb-2 flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-blue-600 text-white">
-              <HugeiconsIcon icon={ChipIcon} size={20} />
-            </div>
-            <div>
-              <DialogTitle className="text-lg font-bold text-zinc-900 dark:text-zinc-50">
-                Welcome to MCP-Flow
-              </DialogTitle>
-              <DialogDescription className="text-sm text-zinc-500">
-                Start from scratch or pick a template to get going fast.
-              </DialogDescription>
-            </div>
+      <DialogContent className="w-[95vw] max-w-4xl overflow-hidden border-zinc-200 p-0 sm:w-[80vw] md:w-[60vw] dark:border-zinc-800 dark:bg-zinc-950">
+        <DialogHeader className="flex flex-row items-center gap-3 border-b border-zinc-100 px-5 py-4 dark:border-zinc-800">
+          <div className="flex size-8 items-center justify-center rounded-lg bg-blue-600 text-white">
+            <HugeiconsIcon icon={ChipIcon} size={16} />
           </div>
-        </div>
+          <div className="flex flex-col gap-0.5 text-left">
+            <DialogTitle className="text-sm font-semibold">Welcome to MCP-Flow</DialogTitle>
+            <DialogDescription className="text-[10px] text-zinc-500">
+              Start from scratch or pick a template to get going fast.
+            </DialogDescription>
+          </div>
+        </DialogHeader>
 
-        <div className="max-h-[55vh] overflow-y-auto px-8 py-6">
+        <div className="max-h-[55vh] overflow-y-auto p-5">
           <button
             onClick={onStartFresh}
             className="group mb-6 flex w-full items-center gap-4 rounded-xl border-2 border-dashed border-zinc-200 px-5 py-4 text-left transition-colors hover:border-blue-400 hover:bg-blue-50/50 dark:border-zinc-800 dark:hover:border-blue-600 dark:hover:bg-blue-950/20"
@@ -127,7 +130,7 @@ export default function TemplatePicker({
           })}
         </div>
 
-        <div className="border-t border-zinc-100 px-8 py-4 dark:border-zinc-800">
+        <div className="border-t border-zinc-100 bg-zinc-50/50 px-5 py-4 dark:border-zinc-800 dark:bg-zinc-900/50">
           <p className="text-center text-[10px] text-zinc-400">
             You can always add, remove, and reconfigure nodes after selecting a template.
           </p>

@@ -6,7 +6,9 @@ import {
   Param,
   Patch,
   Post,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { WorkflowService } from './workflow.service';
 import { GeneratorService } from './generator.service';
 import {
@@ -72,7 +74,7 @@ export class WorkflowController {
   }
 
   @Post('chat')
-  async chat(@Body() body: ChatWorkflowDto): Promise<Record<string, unknown>> {
-    return this.workflowService.chatWithOllama(body);
+  async chat(@Body() body: ChatWorkflowDto, @Res() res: Response) {
+    await this.workflowService.chatWithOllamaStream(body, res);
   }
 }

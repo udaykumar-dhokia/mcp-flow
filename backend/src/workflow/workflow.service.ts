@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import type { Response as ExpressResponse } from 'express';
 import { PrismaService } from '../prisma.service';
 
 import {
@@ -11,7 +12,7 @@ import {
   McpPrompt,
   McpResource,
 } from './dto/graph.dto';
-import { ChatMessageDto } from './dto/workflow.dto';
+import { ChatMessageDto, ChatWorkflowDto } from './dto/workflow.dto';
 
 interface NodeExecutionResult {
   nodeId: string;
@@ -24,8 +25,15 @@ interface NodeExecutionResult {
 interface OllamaToolCall {
   id?: string;
   function?: {
-    name?: string;
-    arguments?: Record<string, unknown> | string;
+    name: string;
+    arguments: string | Record<string, unknown>;
+  };
+}
+
+interface OllamaChunk {
+  message?: {
+    content?: string;
+    tool_calls?: OllamaToolCall[];
   };
 }
 
@@ -123,85 +131,215 @@ export class WorkflowService {
     return this.executeFromInput(graph, input);
   }
 
-  async chatWithOllama({
-    graph,
-    input = {},
-    resources = [],
-    prompts = [],
-    messages,
-    model = 'llama3.1',
-    ollamaUrl = 'http://localhost:11434',
-  }: {
-    graph: Graph;
-    input?: Record<string, unknown>;
-    resources?: McpResource[];
-    prompts?: McpPrompt[];
-    messages: ChatMessageDto[];
-    model?: string;
-    ollamaUrl?: string;
-  }) {
+  async chatWithOllamaStream(
+    {
+      graph,
+      input = {},
+      resources = [],
+      prompts = [],
+      messages,
+      model = 'llama3.1',
+      ollamaUrl = 'http://localhost:11434',
+    }: ChatWorkflowDto,
+    res: ExpressResponse,
+  ) {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
     const tools = graph.nodes
       .filter((node) => node.type === 'inputNode')
       .map((node) => this.toOllamaTool(node));
+
+    if (resources.length > 0) {
+      tools.push({
+        type: 'function',
+        function: {
+          name: 'read_workflow_resource',
+          description:
+            'Read the content of a defined MCP resource by its URI or name.',
+          parameters: {
+            type: 'object',
+            properties: {
+              uri: {
+                type: 'string',
+                description: 'The URI or name of the resource to read.',
+              },
+            },
+            required: ['uri'],
+          },
+        },
+      });
+    }
 
     const systemContext = this.buildMcpContext(resources, prompts);
     const requestMessages = systemContext
       ? [{ role: 'system', content: systemContext }, ...messages]
       : messages;
 
-    const first = await this.callOllama(ollamaUrl, {
-      model,
-      messages: requestMessages,
-      tools,
-      stream: false,
-    });
+    const baseUrl = ollamaUrl.replace(/\/$/, '');
 
-    const assistantMessage = first.message || {
-      role: 'assistant',
-      content: '',
-    };
-    const toolCalls = assistantMessage.tool_calls || [];
-    if (toolCalls.length === 0) {
-      return {
-        message: assistantMessage,
-        toolCalls: [],
-        raw: first,
-      };
-    }
-
-    const executedToolMessages: ChatMessageDto[] = [];
-    const toolResults: Record<string, unknown>[] = [];
-
-    for (const call of toolCalls) {
-      const name = call.function?.name;
-      const args = this.parseToolArguments(call.function?.arguments);
-      if (!name) continue;
-
-      const result = await this.executeFromInput(
-        graph,
-        { ...input, ...args },
-        name,
-      );
-      toolResults.push({ name, arguments: args, result });
-      executedToolMessages.push({
-        role: 'tool',
-        tool_call_id: call.id || name,
-        name,
-        content: JSON.stringify(result),
+    try {
+      const response = await fetch(`${baseUrl}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model,
+          messages: requestMessages,
+          tools: tools.length > 0 ? tools : undefined,
+          stream: true,
+        }),
       });
+
+      if (!response.ok) {
+        const text = await response.text();
+        res.write(
+          `data: ${JSON.stringify({ type: 'error', error: `Ollama returned ${response.status}: ${text}` })}\n\n`,
+        );
+        return res.end();
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) return res.end();
+
+      let isToolCall = false;
+      let accumulatedToolCalls: OllamaToolCall[] = [];
+      let assistantContent = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = new TextDecoder().decode(value);
+        const lines = chunk.split('\n').filter(Boolean);
+        for (const line of lines) {
+          try {
+            const parsed = JSON.parse(line) as OllamaChunk;
+            if (parsed.message?.tool_calls) {
+              isToolCall = true;
+              accumulatedToolCalls = parsed.message.tool_calls;
+            } else if (parsed.message?.content && !isToolCall) {
+              assistantContent += parsed.message.content;
+              res.write(
+                `data: ${JSON.stringify({ type: 'content', content: parsed.message.content })}\n\n`,
+              );
+            }
+          } catch (e) {
+            Logger.error('Failed to parse chunk', e);
+          }
+        }
+      }
+
+      if (!isToolCall) {
+        res.write('data: [DONE]\n\n');
+        return res.end();
+      }
+
+      const executedToolMessages: ChatMessageDto[] = [];
+      const toolResults: Record<string, unknown>[] = [];
+      const assistantMessage: {
+        role: string;
+        content: string;
+        tool_calls: OllamaToolCall[];
+      } = {
+        role: 'assistant',
+        content: assistantContent,
+        tool_calls: accumulatedToolCalls,
+      };
+
+      for (const call of accumulatedToolCalls) {
+        const name = call.function?.name;
+        const args = this.parseToolArguments(call.function?.arguments);
+        if (!name) continue;
+
+        let result: Record<string, unknown>;
+
+        if (name === 'read_workflow_resource') {
+          const uri = typeof args.uri === 'string' ? args.uri : '';
+          const resource = resources.find(
+            (r) => r.uri === uri || r.name === uri,
+          );
+          if (resource) {
+            result = {
+              uri: resource.uri,
+              name: resource.name,
+              content: resource.content,
+              mimeType: resource.mimeType,
+            };
+          } else {
+            result = { error: `Resource "${uri}" not found.` };
+          }
+        } else {
+          result = await this.executeFromInput(
+            graph,
+            { ...input, ...args },
+            name,
+          );
+        }
+
+        toolResults.push({ name: String(name), arguments: args, result });
+        executedToolMessages.push({
+          role: 'tool',
+          tool_call_id: String(call.id || name),
+          name: String(name),
+          content: JSON.stringify(result),
+        });
+      }
+
+      res.write(
+        `data: ${JSON.stringify({ type: 'tool_calls', toolCalls: toolResults })}\n\n`,
+      );
+
+      const finalResponse = await fetch(`${baseUrl}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model,
+          messages: [
+            ...requestMessages,
+            assistantMessage,
+            ...executedToolMessages,
+          ],
+          stream: true,
+        }),
+      });
+
+      if (!finalResponse.ok) {
+        res.write(
+          `data: ${JSON.stringify({ type: 'error', error: 'Ollama final chat failed' })}\n\n`,
+        );
+        return res.end();
+      }
+
+      const finalReader = finalResponse.body?.getReader();
+      if (finalReader) {
+        while (true) {
+          const { done, value } = await finalReader.read();
+          if (done) break;
+          const chunk = new TextDecoder().decode(value);
+          const lines = chunk.split('\n').filter(Boolean);
+          for (const line of lines) {
+            try {
+              const parsed = JSON.parse(line) as OllamaChunk;
+              if (parsed.message?.content) {
+                res.write(
+                  `data: ${JSON.stringify({ type: 'content', content: parsed.message.content })}\n\n`,
+                );
+              }
+            } catch (e) {
+              Logger.error('Failed to parse chunk', e);
+            }
+          }
+        }
+      }
+
+      res.write('data: [DONE]\n\n');
+      res.end();
+    } catch (err) {
+      res.write(
+        `data: ${JSON.stringify({ type: 'error', error: err instanceof Error ? err.message : 'Unknown error' })}\n\n`,
+      );
+      res.end();
     }
-
-    const final = await this.callOllama(ollamaUrl, {
-      model,
-      messages: [...requestMessages, assistantMessage, ...executedToolMessages],
-      stream: false,
-    });
-
-    return {
-      message: final.message,
-      toolCalls: toolResults,
-      raw: final,
-    };
   }
 
   private async executeFromInput(
@@ -345,6 +483,7 @@ export class WorkflowService {
       graph: bundle.graph || { nodes: [], edges: [] },
       resources: bundle.resources || [],
       prompts: bundle.prompts || [],
+      chatConfig: bundle.chatConfig,
     };
   }
 

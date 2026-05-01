@@ -84,9 +84,16 @@ export interface Graph {
   edges: GraphEdge[];
 }
 
+export interface ChatConfig {
+  provider: string;
+  baseUrl: string;
+  model: string;
+}
+
 export interface WorkflowBundle {
   name: string;
   graph: Graph;
   resources: McpResource[];
   prompts: McpPrompt[];
+  chatConfig?: ChatConfig;
 }

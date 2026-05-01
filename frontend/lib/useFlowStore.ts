@@ -11,7 +11,7 @@ import {
   NodeChange,
   EdgeChange,
 } from '@xyflow/react';
-import { McpPrompt, McpResource, SavedWorkflow } from '@/types/workflow';
+import { McpPrompt, McpResource, SavedWorkflow, ChatConfig } from '@/types/workflow';
 
 interface HistoryEntry {
   nodes: Node[];
@@ -36,6 +36,7 @@ interface FlowState {
   prompts: McpPrompt[];
   isSaving: boolean;
   persistenceError: string | null;
+  chatConfig: ChatConfig | null;
 
   executionState: 'idle' | 'running' | 'completed' | 'error';
   executionNodeStatuses: ExecutionNodeStatus[];
@@ -59,6 +60,7 @@ interface FlowState {
   setWorkflowName: (name: string) => void;
   setResources: (resources: McpResource[]) => void;
   setPrompts: (prompts: McpPrompt[]) => void;
+  setChatConfig: (config: ChatConfig) => void;
   clearCanvas: () => void;
   createWorkflow: (name?: string) => Promise<void>;
   saveWorkflow: () => Promise<void>;
@@ -82,7 +84,7 @@ interface FlowState {
 
 const STORAGE_KEY = 'mcp-flow-workspace';
 const MAX_HISTORY = 50;
-const API_BASE = 'http://localhost:3001';
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:2815';
 
 function pushHistory(state: FlowState): Partial<FlowState> {
   const entry: HistoryEntry = {
@@ -104,6 +106,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   prompts: [],
   isSaving: false,
   persistenceError: null,
+  chatConfig: null,
 
   executionState: 'idle',
   executionNodeStatuses: [],
@@ -214,6 +217,10 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     set({ prompts });
     get().saveToLocalStorage();
   },
+  setChatConfig: (chatConfig) => {
+    set({ chatConfig });
+    get().saveToLocalStorage();
+  },
 
   clearCanvas: () => {
     const state = get();
@@ -241,6 +248,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           graph: emptyGraph,
           resources: [],
           prompts: [],
+          chatConfig: null,
         }),
       });
       if (!response.ok) throw new Error('Could not create workflow');
@@ -253,6 +261,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         edges: workflow.graph.edges as Edge[],
         resources: workflow.resources,
         prompts: workflow.prompts,
+        chatConfig: workflow.chatConfig || null,
         selectedNodeId: null,
         past: [],
         future: [],
@@ -275,6 +284,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         edges: [],
         resources: [],
         prompts: [],
+        chatConfig: null,
         persistenceError: error instanceof Error ? error.message : 'Could not create workflow',
       });
       get().saveToLocalStorage();
@@ -290,6 +300,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       graph: { nodes: state.nodes, edges: state.edges },
       resources: state.resources,
       prompts: state.prompts,
+      chatConfig: state.chatConfig,
     };
 
     if (!state.currentWorkflowId || state.currentWorkflowId.startsWith('local-')) {
@@ -369,6 +380,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         edges: selected.graph.edges as Edge[],
         resources: selected.resources || [],
         prompts: selected.prompts || [],
+        chatConfig: selected.chatConfig || null,
         persistenceError: null,
         past: [],
         future: [],
@@ -402,6 +414,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       edges: workflow.graph.edges as Edge[],
       resources: workflow.resources || [],
       prompts: workflow.prompts || [],
+      chatConfig: workflow.chatConfig || null,
       selectedNodeId: null,
       past: [],
       future: [],
@@ -431,6 +444,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           edges: next.graph.edges as Edge[],
           resources: next.resources || [],
           prompts: next.prompts || [],
+          chatConfig: next.chatConfig || null,
         });
       } else {
         await get().createWorkflow('Untitled Workflow');
@@ -501,6 +515,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         currentWorkflowId: state.currentWorkflowId,
         resources: state.resources,
         prompts: state.prompts,
+        chatConfig: state.chatConfig,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch {
@@ -522,6 +537,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           currentWorkflowId: data.currentWorkflowId || null,
           resources: data.resources || [],
           prompts: data.prompts || [],
+          chatConfig: data.chatConfig || null,
         });
       }
     } catch {

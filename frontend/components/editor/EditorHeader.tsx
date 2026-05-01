@@ -16,6 +16,13 @@ import {
 import { useFlowStore } from '@/lib/useFlowStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 import { Logo } from '@/components/ui/Logo';
 
@@ -70,18 +77,18 @@ export default function EditorHeader({
         <Logo size={28} />
 
         <div className="flex items-center gap-3">
-          <select
-            value={currentWorkflowId || ''}
-            onChange={(event) => void switchWorkflow(event.target.value)}
-            className="h-8 max-w-44 rounded-md border border-zinc-200 bg-white px-2 text-xs text-zinc-700 transition-colors outline-none hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900"
-            title="Switch workflow"
-          >
-            {workflows.map((workflow) => (
-              <option key={workflow.id} value={workflow.id}>
-                {workflow.name}
-              </option>
-            ))}
-          </select>
+          <Select value={currentWorkflowId || ''} onValueChange={(val) => void switchWorkflow(val)}>
+            <SelectTrigger className="h-8 w-44 text-xs">
+              <SelectValue placeholder="Select workflow" />
+            </SelectTrigger>
+            <SelectContent>
+              {workflows.map((workflow) => (
+                <SelectItem key={workflow.id} value={workflow.id} className="text-xs">
+                  {workflow.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
           {isEditingName ? (
             <Input

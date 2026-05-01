@@ -100,6 +100,12 @@ export interface ExecutionNodeResult {
   error?: string;
 }
 
+export interface ChatConfig {
+  provider: string;
+  baseUrl: string;
+  model: string;
+}
+
 export interface WorkflowExecutionResponse {
   data?: Record<string, unknown>;
   error?: string;
@@ -114,6 +120,7 @@ export interface SavedWorkflow {
   graph: Graph;
   resources: McpResource[];
   prompts: McpPrompt[];
+  chatConfig?: ChatConfig | null;
   version?: number;
 }
 

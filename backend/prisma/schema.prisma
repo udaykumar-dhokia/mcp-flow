@@ -35,6 +35,8 @@ model Workflow {
   project   Project  @relation(fields: [projectId], references: [id])
   graphJson String // Store the React Flow graph as JSON
   version   Int      @default(1)
+  isLive    Boolean  @default(false)
+  livePort  Int?
   createdAt DateTime @default(now())
 }
 

@@ -13,6 +13,8 @@ import {
   McpResource,
 } from './dto/graph.dto';
 import { ChatMessageDto, ChatWorkflowDto } from './dto/workflow.dto';
+import { GeneratorService } from './generator.service';
+import { LiveService } from './live.service';
 
 interface NodeExecutionResult {
   nodeId: string;
@@ -52,7 +54,11 @@ interface OllamaChatResponse {
 export class WorkflowService {
   private readonly logger = new Logger(WorkflowService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly liveService: LiveService,
+    private readonly generatorService: GeneratorService,
+  ) {}
 
   async listWorkflows() {
     const project = await this.ensureDefaultProject();
@@ -120,8 +126,53 @@ export class WorkflowService {
   }
 
   async deleteWorkflow(id: string) {
+    this.liveService.stopLive(id);
     await this.prisma.workflow.delete({ where: { id } });
     return { ok: true };
+  }
+
+  async toggleLive(id: string, enable: boolean) {
+    const workflow = await this.getWorkflow(id);
+    const code = this.generatorService.generate(
+      workflow.graph,
+      workflow.resources,
+      workflow.prompts,
+    );
+
+    const port = await this.liveService.toggleLive(id, code, enable);
+
+    const updated = await this.prisma.workflow.update({
+      where: { id },
+      data: {
+        isLive: enable,
+        livePort: port,
+      },
+    });
+
+    return {
+      isLive: updated.isLive,
+      livePort: updated.livePort,
+      url: enable ? `http://localhost:${port}/sse` : null,
+    };
+  }
+
+  async getLiveStatus(id: string) {
+    const workflow = await this.prisma.workflow.findUnique({
+      where: { id },
+      select: { isLive: true, livePort: true },
+    });
+
+    if (!workflow) throw new NotFoundException('Workflow not found');
+
+    // Sync in-memory state with DB if necessary (e.g. after server restart)
+    const activePort = this.liveService.getLivePort(id);
+    const isActuallyLive = workflow.isLive && activePort !== null;
+
+    return {
+      isLive: isActuallyLive,
+      livePort: activePort,
+      url: isActuallyLive ? `http://localhost:${activePort}/sse` : null,
+    };
   }
 
   async execute(

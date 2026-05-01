@@ -122,6 +122,8 @@ export interface SavedWorkflow {
   prompts: McpPrompt[];
   chatConfig?: ChatConfig | null;
   version?: number;
+  isLive?: boolean;
+  livePort?: number | null;
 }
 
 export interface ChatMessage {

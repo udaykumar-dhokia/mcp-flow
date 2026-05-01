@@ -52,6 +52,16 @@ export class WorkflowController {
     return this.workflowService.deleteWorkflow(id);
   }
 
+  @Get(':id/live')
+  getLiveStatus(@Param('id') id: string) {
+    return this.workflowService.getLiveStatus(id);
+  }
+
+  @Post(':id/live')
+  toggleLive(@Param('id') id: string, @Body() body: { enable: boolean }) {
+    return this.workflowService.toggleLive(id, body.enable);
+  }
+
   @Post('execute')
   async execute(@Body() body: ExecuteWorkflowDto) {
     return this.workflowService.execute(body.graph, body.input);

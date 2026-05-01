@@ -23,6 +23,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
+import { Copy01Icon } from '@hugeicons/core-free-icons';
 
 import { Logo } from '@/components/ui/Logo';
 
@@ -51,6 +55,9 @@ export default function EditorHeader({
     saveWorkflow,
     isSaving,
     persistenceError,
+    isLive,
+    liveUrl,
+    toggleLive,
   } = useFlowStore();
   const undo = useFlowStore((s) => s.undo);
   const redo = useFlowStore((s) => s.redo);
@@ -151,8 +158,47 @@ export default function EditorHeader({
           ) : (
             <HugeiconsIcon icon={FloppyDiskIcon} size={14} />
           )}
-          {isSaving ? 'Saving' : 'Save'}
+          {isSaving ? 'Saving...' : 'Save'}
         </button>
+
+        <div className="mx-2 h-4 w-px bg-zinc-200 dark:bg-zinc-800" />
+
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 rounded-full border border-zinc-200 bg-zinc-50/50 py-1 pr-2 pl-3 dark:border-zinc-800 dark:bg-zinc-900/50">
+            <Label
+              htmlFor="live-mode"
+              className="flex items-center gap-1.5 text-[10px] font-semibold tracking-wider text-zinc-500 uppercase"
+            >
+              <span
+                className={`size-1.5 rounded-full ${isLive ? 'animate-pulse bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-zinc-300'}`}
+              />
+              Live
+            </Label>
+            <Switch
+              id="live-mode"
+              checked={isLive}
+              onCheckedChange={toggleLive}
+              className="data-[state=checked]:bg-emerald-500"
+            />
+          </div>
+
+          {isLive && liveUrl && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5 border-emerald-100 bg-emerald-50/50 px-2.5 text-xs font-medium text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 dark:border-emerald-900/30 dark:bg-emerald-900/20 dark:text-emerald-400"
+              onClick={() => {
+                void navigator.clipboard.writeText(liveUrl);
+                toast.success('MCP URL copied to clipboard');
+              }}
+            >
+              <HugeiconsIcon icon={Copy01Icon} size={14} />
+              Copy URL
+            </Button>
+          )}
+        </div>
+
+        <div className="mx-2 h-4 w-px bg-zinc-200 dark:bg-zinc-800" />
 
         <button
           onClick={onShowTemplates}

@@ -42,6 +42,19 @@ export class GeneratorService {
     return `import { MCPServer, text, object, widget, error } from "mcp-use/server";
 import { z } from "zod";
 
+// Fix for requestLogger chalk issue
+const mockChalk = (s: any) => s;
+mockChalk.gray = (s: any) => s;
+mockChalk.blue = (s: any) => s;
+mockChalk.green = (s: any) => s;
+mockChalk.yellow = (s: any) => s;
+mockChalk.red = (s: any) => s;
+mockChalk.cyan = (s: any) => s;
+mockChalk.magenta = (s: any) => s;
+mockChalk.white = (s: any) => s;
+mockChalk.bold = (s: any) => s;
+(globalThis as any).chalk = mockChalk;
+
 ${envVars ? `${envVars}\n` : ''}
 const server = new MCPServer({
   name: "mcp-flow-server",
@@ -53,7 +66,8 @@ ${tools.join('\n\n')}
 ${this.generateResources(resources)}
 ${this.generatePrompts(prompts)}
 
-server.listen().then(() => console.log("MCP server running"));
+const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+server.listen(port).then(() => console.log("MCP server running on port " + port));
 `;
   }
 
@@ -336,7 +350,7 @@ ${zodFields}
     const processedUrl = this.templateStr(url);
 
     const headerEntries = Object.entries(headers)
-      .map(([k, v]) => `        "${k}": ${this.templateStr(String(v))},`)
+      .map(([k, v]) => `        "${k}": \`${this.templateStr(String(v))}\`,`)
       .join('\n');
 
     let fetchOptions = `{
@@ -347,7 +361,7 @@ ${headerEntries}
         },`;
 
     if (method !== 'GET' && body) {
-      fetchOptions += `\n        body: JSON.stringify(${this.templateStr(body)}),`;
+      fetchOptions += `\n        body: \`${this.templateStr(body)}\`,`;
     }
 
     fetchOptions += '\n      }';

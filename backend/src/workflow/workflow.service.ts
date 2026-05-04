@@ -13,6 +13,8 @@ import {
   McpResource,
 } from './dto/graph.dto';
 import { ChatMessageDto, ChatWorkflowDto } from './dto/workflow.dto';
+import { GeneratorService } from './generator.service';
+import { LiveService } from './live.service';
 
 interface NodeExecutionResult {
   nodeId: string;
@@ -52,7 +54,11 @@ interface OllamaChatResponse {
 export class WorkflowService {
   private readonly logger = new Logger(WorkflowService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly liveService: LiveService,
+    private readonly generatorService: GeneratorService,
+  ) {}
 
   async listWorkflows() {
     const project = await this.ensureDefaultProject();
@@ -69,6 +75,7 @@ export class WorkflowService {
         graph: bundle.graph,
         resources: bundle.resources,
         prompts: bundle.prompts,
+        chatConfig: bundle.chatConfig,
         version: workflow.version,
         createdAt: workflow.createdAt,
       };
@@ -106,6 +113,7 @@ export class WorkflowService {
       graph: bundle.graph ?? current.graph,
       resources: bundle.resources ?? current.resources,
       prompts: bundle.prompts ?? current.prompts,
+      chatConfig: bundle.chatConfig ?? current.chatConfig,
     });
 
     const workflow = await this.prisma.workflow.update({
@@ -120,8 +128,53 @@ export class WorkflowService {
   }
 
   async deleteWorkflow(id: string) {
+    this.liveService.stopLive(id);
     await this.prisma.workflow.delete({ where: { id } });
     return { ok: true };
+  }
+
+  async toggleLive(id: string, enable: boolean) {
+    const workflow = await this.getWorkflow(id);
+    const code = this.generatorService.generate(
+      workflow.graph,
+      workflow.resources,
+      workflow.prompts,
+    );
+
+    const port = await this.liveService.toggleLive(id, code, enable);
+
+    const updated = await this.prisma.workflow.update({
+      where: { id },
+      data: {
+        isLive: enable,
+        livePort: port,
+      },
+    });
+
+    return {
+      isLive: updated.isLive,
+      livePort: updated.livePort,
+      url: enable ? `http://localhost:${port}/sse` : null,
+    };
+  }
+
+  async getLiveStatus(id: string) {
+    const workflow = await this.prisma.workflow.findUnique({
+      where: { id },
+      select: { isLive: true, livePort: true },
+    });
+
+    if (!workflow) throw new NotFoundException('Workflow not found');
+
+    // Sync in-memory state with DB if necessary (e.g. after server restart)
+    const activePort = this.liveService.getLivePort(id);
+    const isActuallyLive = workflow.isLive && activePort !== null;
+
+    return {
+      isLive: isActuallyLive,
+      livePort: activePort,
+      url: isActuallyLive ? `http://localhost:${activePort}/sse` : null,
+    };
   }
 
   async execute(
@@ -795,23 +848,29 @@ export class WorkflowService {
         return secrets[key.trim()] || match;
       })
       .replace(/\{\{input\.(.*?)\}\}/g, (match: string, path: string) => {
-        const val = state[path.trim()];
-        return val !== undefined
-          ? typeof val === 'object'
-            ? JSON.stringify(val)
-            : // eslint-disable-next-line @typescript-eslint/no-base-to-string
-              String(val)
-          : match;
+        const key = path.trim();
+        const val = state[key];
+        if (val !== undefined) {
+          return typeof val === 'string' ? val : JSON.stringify(val);
+        }
+        if (secrets[key]) {
+          return secrets[key];
+        }
+        return match;
       })
       .replace(/\{\{(.*?)\}\}/g, (match: string, path: string) => {
         const cleanPath = path.trim().replace(/^input\./, '');
-        const val = this.getNestedValue(state, cleanPath);
-        return val !== undefined
-          ? typeof val === 'object'
-            ? JSON.stringify(val)
-            : // eslint-disable-next-line @typescript-eslint/no-base-to-string
-              String(val)
-          : match;
+        let val = this.getNestedValue(state, cleanPath);
+
+        if (val === undefined) {
+          val = secrets[cleanPath];
+        }
+
+        if (val !== undefined) {
+          return typeof val === 'string' ? val : JSON.stringify(val);
+        }
+
+        return match;
       });
   }
 }

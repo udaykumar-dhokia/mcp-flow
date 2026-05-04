@@ -21,6 +21,8 @@ export const metadata: Metadata = {
     'Build MCP-compatible tools visually with a drag-and-drop node editor. Export production-ready servers for Claude, ChatGPT, Cursor, and Copilot.',
 };
 
+import { Toaster } from 'sonner';
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -38,7 +40,10 @@ export default function RootLayout({
         inter.variable,
       )}
     >
-      <body className="flex min-h-full flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">
+        {children}
+        <Toaster position="top-center" richColors />
+      </body>
     </html>
   );
 }

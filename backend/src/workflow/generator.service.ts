@@ -31,7 +31,13 @@ export class GeneratorService {
 
     const secretNodes = nodes.filter((n) => n.type === 'secretNode');
     const envVars = secretNodes
-      .map((s) => `// ${s.data.secretKey}: Set in your .env file`)
+      .map((s) => {
+        const key = s.data.secretKey || 'UNKNOWN_KEY';
+        return `const ${key} = process.env["${key}"];
+if (!${key}) {
+  console.warn("Warning: Environment variable ${key} is not set. Requests using this secret may fail.");
+}`;
+      })
       .join('\n');
 
     const tools = inputNodes.map((inputNode) => {
@@ -53,7 +59,8 @@ ${tools.join('\n\n')}
 ${this.generateResources(resources)}
 ${this.generatePrompts(prompts)}
 
-server.listen().then(() => console.log("MCP server running"));
+const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+server.listen(port).then(() => console.log("MCP server running on port " + port));
 `;
   }
 
@@ -257,7 +264,6 @@ ${bodyLines}
     uri: ${JSON.stringify(resource.uri)},
     title: ${JSON.stringify(resource.title || resource.name)},
     description: ${JSON.stringify(resource.description || '')},
-    mimeType: ${JSON.stringify(resource.mimeType || 'text/plain')},
   },
   async () => ${content}
 );`;
@@ -336,7 +342,7 @@ ${zodFields}
     const processedUrl = this.templateStr(url);
 
     const headerEntries = Object.entries(headers)
-      .map(([k, v]) => `        "${k}": ${this.templateStr(String(v))},`)
+      .map(([k, v]) => `        "${k}": \`${this.templateStr(String(v))}\`,`)
       .join('\n');
 
     let fetchOptions = `{
@@ -347,7 +353,7 @@ ${headerEntries}
         },`;
 
     if (method !== 'GET' && body) {
-      fetchOptions += `\n        body: JSON.stringify(${this.templateStr(body)}),`;
+      fetchOptions += `\n        body: \`${this.templateStr(body)}\`,`;
     }
 
     fetchOptions += '\n      }';
@@ -461,9 +467,9 @@ return object(data);`;
 
   private templateStr(str: string): string {
     return str
-      .replace(/\{\{input\.(.*?)\}\}/g, '${params.$1}')
+      .replace(/\{\{input\.(.*?)\}\}/g, '${params.$1 ?? process.env["$1"]}')
       .replace(/\{\{secret\.(.*?)\}\}/g, '${process.env["$1"]}')
-      .replace(/\{\{(.*?)\}\}/g, '${data.$1}');
+      .replace(/\{\{(.*?)\}\}/g, '${data.$1 ?? process.env["$1"]}');
   }
 
   private safeJson(raw: string): string {

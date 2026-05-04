@@ -4,9 +4,11 @@ import { WorkflowService } from './workflow.service';
 import { WorkflowController } from './workflow.controller';
 import { GeneratorService } from './generator.service';
 
+import { LiveService } from './live.service';
+
 @Module({
   controllers: [WorkflowController],
-  providers: [WorkflowService, GeneratorService, PrismaService],
-  exports: [WorkflowService, GeneratorService],
+  providers: [WorkflowService, GeneratorService, PrismaService, LiveService],
+  exports: [WorkflowService, GeneratorService, LiveService],
 })
 export class WorkflowModule {}

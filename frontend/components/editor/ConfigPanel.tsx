@@ -12,6 +12,7 @@ import {
   SquareLockPasswordIcon,
   Delete02Icon,
   Add01Icon,
+  Note01Icon,
 } from '@hugeicons/core-free-icons';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -60,6 +61,11 @@ const NODE_META: Record<string, { icon: any; label: string; color: string }> = {
     icon: SquareLockPasswordIcon,
     label: 'Secret',
     color: 'text-red-500',
+  },
+  noteNode: {
+    icon: Note01Icon,
+    label: 'Note',
+    color: 'text-amber-500',
   },
 };
 
@@ -137,6 +143,7 @@ export default function ConfigPanel({ selectedNode, onUpdateNode }: ConfigPanelP
               <ConditionNodeConfig data={data} onChange={handleValueChange} />
             )}
             {type === 'secretNode' && <SecretNodeConfig data={data} onChange={handleValueChange} />}
+            {type === 'noteNode' && <NoteNodeConfig data={data} onChange={handleValueChange} />}
           </div>
         </TabsContent>
 
@@ -680,6 +687,32 @@ function SecretNodeConfig({
           placeholder="What is this secret for?"
           className="h-8 text-xs"
         />
+      </div>
+    </>
+  );
+}
+
+function NoteNodeConfig({
+  data,
+  onChange,
+}: {
+  data: GraphNodeData;
+  onChange: (name: string, value: unknown) => void;
+}) {
+  return (
+    <>
+      <div className="flex flex-col gap-1.5">
+        <Label className="text-xs">Note Content</Label>
+        <Textarea
+          value={data.noteText || ''}
+          onChange={(e) => onChange('noteText', e.target.value)}
+          rows={8}
+          className="font-mono text-xs"
+          placeholder="Write your notes here... Markdown is supported."
+        />
+        <p className="text-[9px] text-zinc-400">
+          Supports Markdown: **bold**, *italic*, `code`, lists, headings, etc.
+        </p>
       </div>
     </>
   );

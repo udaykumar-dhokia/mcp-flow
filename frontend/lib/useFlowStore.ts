@@ -37,6 +37,8 @@ interface FlowState {
   isSaving: boolean;
   persistenceError: string | null;
   chatConfig: ChatConfig | null;
+  isLive: boolean;
+  liveUrl: string | null;
 
   executionState: 'idle' | 'running' | 'completed' | 'error';
   executionNodeStatuses: ExecutionNodeStatus[];
@@ -67,6 +69,8 @@ interface FlowState {
   loadWorkflows: () => Promise<void>;
   switchWorkflow: (id: string) => Promise<void>;
   deleteWorkflow: (id: string) => Promise<void>;
+  toggleLive: (enable: boolean) => Promise<void>;
+  fetchLiveStatus: () => Promise<void>;
 
   undo: () => void;
   redo: () => void;
@@ -107,6 +111,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   isSaving: false,
   persistenceError: null,
   chatConfig: null,
+  isLive: false,
+  liveUrl: null,
 
   executionState: 'idle',
   executionNodeStatuses: [],
@@ -420,6 +426,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       future: [],
     });
     get().saveToLocalStorage();
+    await get().fetchLiveStatus();
   },
 
   deleteWorkflow: async (id) => {
@@ -451,6 +458,39 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       }
     }
     get().saveToLocalStorage();
+  },
+
+  toggleLive: async (enable: boolean) => {
+    const { currentWorkflowId } = get();
+    if (!currentWorkflowId) return;
+
+    try {
+      const response = await fetch(`${API_BASE}/workflow/${currentWorkflowId}/live`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enable }),
+      });
+
+      if (!response.ok) throw new Error('Failed to toggle live mode');
+      const data = await response.json();
+      set({ isLive: data.isLive, liveUrl: data.url });
+    } catch (err) {
+      console.error('Toggle live error:', err);
+    }
+  },
+
+  fetchLiveStatus: async () => {
+    const { currentWorkflowId } = get();
+    if (!currentWorkflowId) return;
+
+    try {
+      const response = await fetch(`${API_BASE}/workflow/${currentWorkflowId}/live`);
+      if (!response.ok) throw new Error('Failed to fetch live status');
+      const data = await response.json();
+      set({ isLive: data.isLive, liveUrl: data.url });
+    } catch (err) {
+      console.error('Fetch live status error:', err);
+    }
   },
 
   undo: () => {

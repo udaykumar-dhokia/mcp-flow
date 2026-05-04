@@ -86,6 +86,16 @@ Dynamic `mcp-use` server code generation:
 - Last-used parameter values remembered in localStorage.
 - Generic JSON result viewer in the output panel.
 
+### Live Connectivity
+
+Expose your workflows as active MCP endpoints with a single click:
+
+- **One-Click Live Mode**: Toggle the "Live" switch to spawn an independent, background MCP server for the current workflow.
+- **Dynamic Port Allocation**: The backend automatically finds and manages free ports for active workflows.
+- **SSE Endpoints**: Live servers are exposed via Server-Sent Events (SSE), compatible with standard MCP clients and the MCP Inspector.
+- **Process Management**: Backend tracks and manages lifecycle for all live workflow processes (isolated using `ts-node`).
+- **URL Persistence**: Live status and endpoints are persisted in the database, allowing servers to stay active across reloads.
+
 ## Getting Started
 
 ### Prerequisites
@@ -97,23 +107,24 @@ Dynamic `mcp-use` server code generation:
 
 ```bash
 # Install dependencies
-cd frontend && npm install
-cd ../backend && npm install
+pnpm install
 
 # Start both services
 pnpm dev
 # Or run individually:
-cd frontend && npm run dev     # http://localhost:1528
-cd backend && npm run dev      # http://localhost:3001
+cd frontend && pnpm run dev     # http://localhost:1528
+cd backend && pnpm run dev      # http://localhost:2815
 ```
 
 ### API Endpoints
 
-| Method | Path                 | Description              |
-| ------ | -------------------- | ------------------------ |
-| POST   | `/workflow/execute`  | Execute a workflow graph |
-| POST   | `/workflow/generate` | Generate MCP server code |
-| POST   | `/workflow/validate` | Validate graph integrity |
+| Method | Path                 | Description                           |
+| ------ | -------------------- | ------------------------------------- |
+| POST   | `/workflow/execute`  | Execute a workflow graph              |
+| POST   | `/workflow/generate` | Generate MCP server code              |
+| POST   | `/workflow/validate` | Validate graph integrity              |
+| GET    | `/workflow/:id/live` | Get live status and URL               |
+| POST   | `/workflow/:id/live` | Toggle live mode (start/stop process) |
 
 ## Generated Server Example
 
@@ -154,7 +165,3 @@ server.tool(
 
 server.listen().then(() => console.log('MCP server running'));
 ```
-
-## License
-
-UNLICENSED

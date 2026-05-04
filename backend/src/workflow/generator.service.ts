@@ -31,7 +31,13 @@ export class GeneratorService {
 
     const secretNodes = nodes.filter((n) => n.type === 'secretNode');
     const envVars = secretNodes
-      .map((s) => `// ${s.data.secretKey}: Set in your .env file`)
+      .map((s) => {
+        const key = s.data.secretKey || 'UNKNOWN_KEY';
+        return `const ${key} = process.env["${key}"];
+if (!${key}) {
+  console.warn("Warning: Environment variable ${key} is not set. Requests using this secret may fail.");
+}`;
+      })
       .join('\n');
 
     const tools = inputNodes.map((inputNode) => {
@@ -41,19 +47,6 @@ export class GeneratorService {
 
     return `import { MCPServer, text, object, widget, error } from "mcp-use/server";
 import { z } from "zod";
-
-// Fix for requestLogger chalk issue
-const mockChalk = (s: any) => s;
-mockChalk.gray = (s: any) => s;
-mockChalk.blue = (s: any) => s;
-mockChalk.green = (s: any) => s;
-mockChalk.yellow = (s: any) => s;
-mockChalk.red = (s: any) => s;
-mockChalk.cyan = (s: any) => s;
-mockChalk.magenta = (s: any) => s;
-mockChalk.white = (s: any) => s;
-mockChalk.bold = (s: any) => s;
-(globalThis as any).chalk = mockChalk;
 
 ${envVars ? `${envVars}\n` : ''}
 const server = new MCPServer({
@@ -271,7 +264,6 @@ ${bodyLines}
     uri: ${JSON.stringify(resource.uri)},
     title: ${JSON.stringify(resource.title || resource.name)},
     description: ${JSON.stringify(resource.description || '')},
-    mimeType: ${JSON.stringify(resource.mimeType || 'text/plain')},
   },
   async () => ${content}
 );`;
@@ -475,9 +467,9 @@ return object(data);`;
 
   private templateStr(str: string): string {
     return str
-      .replace(/\{\{input\.(.*?)\}\}/g, '${params.$1}')
+      .replace(/\{\{input\.(.*?)\}\}/g, '${params.$1 ?? process.env["$1"]}')
       .replace(/\{\{secret\.(.*?)\}\}/g, '${process.env["$1"]}')
-      .replace(/\{\{(.*?)\}\}/g, '${data.$1}');
+      .replace(/\{\{(.*?)\}\}/g, '${data.$1 ?? process.env["$1"]}');
   }
 
   private safeJson(raw: string): string {

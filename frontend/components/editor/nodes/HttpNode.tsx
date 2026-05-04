@@ -22,7 +22,7 @@ const HttpNode = ({ data, id, selected }: NodeProps) => {
   return (
     <NodeWrapper id={id} selected={selected}>
       <div className="bg-primary/3 flex items-center gap-2 border-b border-zinc-100 px-3 py-2 dark:border-zinc-800 dark:bg-emerald-950/30">
-        <div className="bg-primary/5 flex size-6 items-center justify-center rounded text-emerald-700">
+        <div className="flex size-6 items-center justify-center rounded bg-white text-black inset-shadow-sm inset-shadow-emerald-700/60">
           <HugeiconsIcon icon={Globe02Icon} size={14} />
         </div>
         <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">HTTP Request</span>

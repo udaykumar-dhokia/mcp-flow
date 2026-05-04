@@ -63,6 +63,8 @@ export interface GraphNodeData {
 
   secretKey?: string;
   secretValue?: string;
+
+  noteText?: string;
 }
 
 export interface GraphNode {

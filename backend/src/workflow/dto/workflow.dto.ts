@@ -1,10 +1,11 @@
-import { Graph, McpPrompt, McpResource } from './graph.dto';
+import { ChatConfig, Graph, McpPrompt, McpResource } from './graph.dto';
 
 export class CreateWorkflowDto {
   name?: string;
   graph?: Graph;
   resources?: McpResource[];
   prompts?: McpPrompt[];
+  chatConfig?: ChatConfig;
 }
 
 export class UpdateWorkflowDto {
@@ -12,6 +13,7 @@ export class UpdateWorkflowDto {
   graph?: Graph;
   resources?: McpResource[];
   prompts?: McpPrompt[];
+  chatConfig?: ChatConfig;
 }
 
 export class ExecuteWorkflowDto {

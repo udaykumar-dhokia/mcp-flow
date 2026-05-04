@@ -24,6 +24,7 @@ import { ExecutionNodeResult, WorkflowExecutionResponse } from '@/types/workflow
 import TransformNode from './nodes/TransformNode';
 import ConditionNode from './nodes/ConditionNode';
 import SecretNode from './nodes/SecretNode';
+import NoteNode from './nodes/NoteNode';
 
 import CustomEdge from './edges/CustomEdge';
 import ConfigPanel from './ConfigPanel';
@@ -52,6 +53,7 @@ const nodeTypes = {
   transformNode: TransformNode,
   conditionNode: ConditionNode,
   secretNode: SecretNode,
+  noteNode: NoteNode,
 };
 
 const edgeTypes = {
@@ -395,7 +397,7 @@ function FlowEditorInner() {
           modal={false}
         >
           <DialogContent
-            className="fixed top-12 right-0 left-auto h-[calc(100vh-3rem)] w-full max-w-md translate-x-0 translate-y-0 overflow-hidden rounded-none border-l border-zinc-200 p-0 shadow-none dark:border-zinc-800 dark:bg-zinc-950"
+            className="fixed top-14 right-0 left-auto h-[calc(100vh-3.5rem)] w-full max-w-md translate-x-0 translate-y-0 overflow-hidden rounded-none border-l border-zinc-200 p-0 shadow-none dark:border-zinc-800 dark:bg-zinc-950"
             hideOverlay
             showCloseButton={false}
           >
@@ -414,7 +416,7 @@ function FlowEditorInner() {
           modal={false}
         >
           <DialogContent
-            className="fixed top-12 right-0 left-auto flex h-[calc(100vh-3rem)] w-[450px] max-w-lg translate-x-0 translate-y-0 flex-col rounded-none border-l border-zinc-200 bg-white p-0 shadow-none dark:border-zinc-800 dark:bg-zinc-950"
+            className="fixed top-14 right-0 left-auto flex h-[calc(100vh-3.5rem)] w-[450px] max-w-lg translate-x-0 translate-y-0 flex-col rounded-none border-l border-zinc-200 bg-white p-0 shadow-none dark:border-zinc-800 dark:bg-zinc-950"
             hideOverlay
             showCloseButton={false}
           >

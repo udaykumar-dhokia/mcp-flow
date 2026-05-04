@@ -75,6 +75,7 @@ export class WorkflowService {
         graph: bundle.graph,
         resources: bundle.resources,
         prompts: bundle.prompts,
+        chatConfig: bundle.chatConfig,
         version: workflow.version,
         createdAt: workflow.createdAt,
       };
@@ -112,6 +113,7 @@ export class WorkflowService {
       graph: bundle.graph ?? current.graph,
       resources: bundle.resources ?? current.resources,
       prompts: bundle.prompts ?? current.prompts,
+      chatConfig: bundle.chatConfig ?? current.chatConfig,
     });
 
     const workflow = await this.prisma.workflow.update({
@@ -846,23 +848,29 @@ export class WorkflowService {
         return secrets[key.trim()] || match;
       })
       .replace(/\{\{input\.(.*?)\}\}/g, (match: string, path: string) => {
-        const val = state[path.trim()];
-        return val !== undefined
-          ? typeof val === 'object'
-            ? JSON.stringify(val)
-            : // eslint-disable-next-line @typescript-eslint/no-base-to-string
-              String(val)
-          : match;
+        const key = path.trim();
+        const val = state[key];
+        if (val !== undefined) {
+          return typeof val === 'string' ? val : JSON.stringify(val);
+        }
+        if (secrets[key]) {
+          return secrets[key];
+        }
+        return match;
       })
       .replace(/\{\{(.*?)\}\}/g, (match: string, path: string) => {
         const cleanPath = path.trim().replace(/^input\./, '');
-        const val = this.getNestedValue(state, cleanPath);
-        return val !== undefined
-          ? typeof val === 'object'
-            ? JSON.stringify(val)
-            : // eslint-disable-next-line @typescript-eslint/no-base-to-string
-              String(val)
-          : match;
+        let val = this.getNestedValue(state, cleanPath);
+
+        if (val === undefined) {
+          val = secrets[cleanPath];
+        }
+
+        if (val !== undefined) {
+          return typeof val === 'string' ? val : JSON.stringify(val);
+        }
+
+        return match;
       });
   }
 }

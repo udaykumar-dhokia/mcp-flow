@@ -10,8 +10,10 @@ import {
   GitBranchIcon,
   SquareLockPasswordIcon,
   Search01Icon,
+  Note01Icon,
 } from '@hugeicons/core-free-icons';
 import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 
 interface NodeDefinition {
   type: string;
@@ -79,9 +81,28 @@ const NODE_DEFINITIONS: NodeDefinition[] = [
     category: 'Security',
     defaultData: { secretKey: '', secretValue: '', description: '' },
   },
+  {
+    type: 'noteNode',
+    label: 'Note',
+    description: 'Add sticky notes and documentation',
+    icon: Note01Icon,
+    color: 'yellow-600',
+    category: 'Utility',
+    defaultData: { noteText: '' },
+  },
 ];
 
-const CATEGORIES = ['Triggers', 'Actions', 'Logic', 'Output', 'Security'];
+const INSET_SHADOW_COLOR_MAP: Record<string, string> = {
+  'blue-700': 'inset-shadow-blue-700/60',
+  'emerald-700': 'inset-shadow-emerald-700/60',
+  'amber-600': 'inset-shadow-amber-600/60',
+  'orange-700': 'inset-shadow-orange-700/60',
+  'purple-700': 'inset-shadow-purple-700/60',
+  'red-700': 'inset-shadow-red-700/60',
+  'yellow-600': 'inset-shadow-yellow-600/60',
+};
+
+const CATEGORIES = ['Triggers', 'Actions', 'Logic', 'Output', 'Security', 'Utility'];
 
 interface NodePaletteProps {
   isCollapsed: boolean;
@@ -199,7 +220,10 @@ export default function NodePalette({ isCollapsed, onToggle }: NodePaletteProps)
                     className="flex cursor-grab items-center gap-2.5 rounded-md border border-transparent px-2.5 py-2 transition-colors hover:border-zinc-200 hover:bg-zinc-50 active:cursor-grabbing dark:hover:border-zinc-800 dark:hover:bg-zinc-900"
                   >
                     <div
-                      className={`bg-primary/5 flex text-${node.color} size-7 shrink-0 items-center justify-center rounded`}
+                      className={cn(
+                        'flex size-7 shrink-0 items-center justify-center rounded bg-white text-black inset-shadow-sm',
+                        INSET_SHADOW_COLOR_MAP[node.color],
+                      )}
                     >
                       <HugeiconsIcon icon={node.icon} size={14} />
                     </div>

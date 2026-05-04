@@ -79,7 +79,7 @@ export default function EditorHeader({
   };
 
   return (
-    <div className="flex h-14 items-center justify-between border-b border-zinc-200 bg-white px-4 dark:border-zinc-800 dark:bg-zinc-950">
+    <div className="relative z-50 flex h-14 items-center justify-between border-b border-zinc-200 bg-white px-4 dark:border-zinc-800 dark:bg-zinc-950">
       <div className="flex items-center gap-6">
         <Logo size={28} />
 
